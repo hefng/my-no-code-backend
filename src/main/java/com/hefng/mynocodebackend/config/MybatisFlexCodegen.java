@@ -14,6 +14,8 @@ import java.util.Map;
  */
 public class MybatisFlexCodegen {
 
+    public static final String CREATE_TABLE = "app";
+
     public static void main(String[] args) {
         Dict dict = YamlUtil.loadByPath("application.yml");
         Map<String, Object> databaseConfig = dict.getByPath("spring.datasource");
@@ -47,7 +49,7 @@ public class MybatisFlexCodegen {
         // 生成哪个Schema下的表
         globalConfig.setGenerateSchema("my_nocode_backend");
         //设置表前缀和只生成哪些表
-        globalConfig.setGenerateTable("user");
+        globalConfig.setGenerateTable(CREATE_TABLE);
         // 设置逻辑删除字段
         globalConfig.setLogicDeleteColumn("isDelete");
 
