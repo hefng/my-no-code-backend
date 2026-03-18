@@ -7,6 +7,7 @@ import com.hefng.mynocodebackend.common.BaseResponse;
 import com.hefng.mynocodebackend.common.DeleteRequest;
 import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.common.ResultUtils;
+import com.hefng.mynocodebackend.constant.AppConstant;
 import com.hefng.mynocodebackend.constant.UserConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.exception.ThrowUtils;
@@ -271,11 +272,10 @@ public class AppController {
         // 限制每页最多 20 个
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR, "每页最多 20 个");
         
-        // 查询精选应用（优先级大于 0）
+        // 查询精选应用（优先级为99）
         QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
-        queryWrapper.and(APP.PRIORITY.gt(0));
-        queryWrapper.orderBy(APP.PRIORITY, false); // 按优先级降序
-        
+        queryWrapper.and(APP.PRIORITY.eq(AppConstant.MAX_PRIORITY));
+
         Page<App> appPage = appService.page(new Page<>(current, size), queryWrapper);
         
         Page<AppVO> appVOPage = new Page<>(current, size, appPage.getTotalRow());
