@@ -22,11 +22,11 @@ public abstract class CodeFileSaverTemplate<T> {
      * @param result 代码生成结果对象, 包含需要保存的代码内容
      * @return 保存后的文件对象
      */
-    public File saveCodeFile(T result) {
+    public File saveCodeFile(T result, Long appId) {
         // 校验
         validResult(result);
         // 获取唯一路径
-        String uniquePath = buildUniqueFilePath();
+        String uniquePath = buildUniqueFilePath(appId);
         // 写入文件 返回文件对象
         return writeToFile(uniquePath, result);
     }
@@ -56,8 +56,8 @@ public abstract class CodeFileSaverTemplate<T> {
      * 构建唯一的文件路径
      * @return
      */
-    private String buildUniqueFilePath() {
-        String uniqueFileName = getType() + "_" + IdUtil.getSnowflakeNextIdStr();
+    private String buildUniqueFilePath(Long appId) {
+        String uniqueFileName = getType() + "_" + appId;
         String uniqueFilePath = DEFAULT_SAVE_PATH + "codegen" + File.separator + uniqueFileName;
         FileUtil.mkdir(uniqueFilePath);
         return uniqueFilePath;

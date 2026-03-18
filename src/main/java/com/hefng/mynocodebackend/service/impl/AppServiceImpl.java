@@ -1,9 +1,12 @@
 package com.hefng.mynocodebackend.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.hefng.mynocodebackend.ai.AiCodegenServiceFaced;
+import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.constant.CommonConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
+import com.hefng.mynocodebackend.exception.ThrowUtils;
 import com.hefng.mynocodebackend.mapper.AppMapper;
 import com.hefng.mynocodebackend.model.dto.app.AppQueryRequest;
 import com.hefng.mynocodebackend.model.entity.App;
@@ -19,6 +22,7 @@ import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +42,24 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private AiCodegenServiceFaced aiCodegenServiceFaced;
+
+    @Override
+    public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
+        // 1. 参数校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
+        ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+
+        // 2. 获取应用信息
+        App app = getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        ThrowUtils.throwIf(!app.getAppOwnerId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
+
+        // 3. 调用 AI 生成代码 返回 AI 生成的代码流
+        return aiCodegenServiceFaced.generateAndSaveCodeWithStream(userMessage, CodegenTypeEnum.HTML, appId);
+    }
 
     @Override
     public AppVO getAppVO(App app) {

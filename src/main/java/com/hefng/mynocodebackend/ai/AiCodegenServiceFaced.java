@@ -32,18 +32,18 @@ public class AiCodegenServiceFaced {
      * @param codegenTypeEnum 代码类型，例如 "html" 或 "multi"（表示生成多文件代码）
      * @return
      */
-    public File generateAndSaveCode(String userMessage, CodegenTypeEnum codegenTypeEnum) {
+    public File generateAndSaveCode(String userMessage, CodegenTypeEnum codegenTypeEnum, Long appId) {
         if (codegenTypeEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "代码生成类型不能为空");
         }
         return switch (codegenTypeEnum) {
             case HTML -> {
                 HTMLCodeResult htmlCodeResult = aiCodegenService.generateHtml(userMessage);
-                yield CodeFileSaverExecutor.saveCodeFile(htmlCodeResult, CodegenTypeEnum.HTML);
+                yield CodeFileSaverExecutor.saveCodeFile(htmlCodeResult, CodegenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
                 MultiFileCodeResult multiFileCodeResult = aiCodegenService.generateMultiFileCode(userMessage);
-                yield CodeFileSaverExecutor.saveCodeFile(multiFileCodeResult, CodegenTypeEnum.MULTI_FILE);
+                yield CodeFileSaverExecutor.saveCodeFile(multiFileCodeResult, CodegenTypeEnum.MULTI_FILE, appId);
             }
         };
     }
@@ -54,18 +54,18 @@ public class AiCodegenServiceFaced {
      * @param codegenTypeEnum 代码类型，例如 "html" 或 "multi"（表示生成多文件代码）
      * @return
      */
-    public Flux<String> generateAndSaveCodeWithStream(String userMessage, CodegenTypeEnum codegenTypeEnum) {
+    public Flux<String> generateAndSaveCodeWithStream(String userMessage, CodegenTypeEnum codegenTypeEnum, Long appId) {
         if (codegenTypeEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "代码生成类型不能为空");
         }
         return switch (codegenTypeEnum) {
             case HTML -> {
                 Flux<String> result = aiCodegenService.generateHtmlStream(userMessage);
-                yield processCodeStream(result, CodegenTypeEnum.HTML);
+                yield processCodeStream(result, CodegenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
                 Flux<String> result = aiCodegenService.generateMultiFileCodeStream(userMessage);
-                yield processCodeStream(result, CodegenTypeEnum.MULTI_FILE);
+                yield processCodeStream(result, CodegenTypeEnum.MULTI_FILE, appId);
             }
         };
     }
@@ -77,7 +77,7 @@ public class AiCodegenServiceFaced {
      * @param codegenTypeEnum 代码类型，例如 "html" 或 "multi_file"（表示生成多文件代码）
      * @return
      */
-    public Flux<String> processCodeStream(Flux<String> result, CodegenTypeEnum codegenTypeEnum) {
+    public Flux<String> processCodeStream(Flux<String> result, CodegenTypeEnum codegenTypeEnum, Long appId) {
         // 由于是流式输出，我们需要在流完成时对接收到的代码进行解析和保存，因此我们使用 doOnNext 和 doOnComplete 来处理流中的数据
         StringBuilder multiFileCodeBuilder = new StringBuilder();
         return result.doOnNext(multiFileCodeBuilder::append).doOnComplete(() -> {
@@ -86,7 +86,7 @@ public class AiCodegenServiceFaced {
                 String multiFileCode = multiFileCodeBuilder.toString();
                 CodeParserExecutor.parseCode(multiFileCode, codegenTypeEnum);
                 // 保存代码到文件
-                File file = CodeFileSaverExecutor.saveCodeFile(multiFileCode, codegenTypeEnum);
+                File file = CodeFileSaverExecutor.saveCodeFile(multiFileCode, codegenTypeEnum, appId);
                 log.info("多文件代码生成并保存完成，保存路径: {}", file.getAbsolutePath());
             } catch (Exception e) {
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "多文件代码生成失败: " + e.getMessage());

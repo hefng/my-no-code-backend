@@ -1,6 +1,7 @@
 package com.hefng.mynocodebackend.controller;
 
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.json.JSONUtil;
 import com.hefng.mynocodebackend.annotation.AuthCheck;
 import com.hefng.mynocodebackend.common.BaseResponse;
 import com.hefng.mynocodebackend.common.DeleteRequest;
@@ -24,10 +25,16 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.awt.*;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
 
@@ -46,7 +53,50 @@ public class AppController {
     @Resource
     private UserService userService;
 
-    // region 用户功能
+    /**
+     * 调用 AI 生成代码
+     *
+     * @param appId
+     * @param userMessage
+     * @param request
+     * @return
+     */
+    @GetMapping(value = "chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
+                                                      @RequestParam String userMessage,
+                                                      HttpServletRequest request) {
+        // 校验参数
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
+        ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+
+        User loginUser = userService.getLoginUser(request);
+        Flux<String> rawFlux = appService.chatToGenCode(appId, userMessage, loginUser);
+        // 增量事件, 每当 rawFlux 产生一个新的代码块时，就将其包装成一个 ServerSentEvent 发送给前端
+        Flux<ServerSentEvent<String>> message = rawFlux.map(chunk -> {
+            Map<String, String> d = Map.of("d", chunk);
+            String dataJson = JSONUtil.toJsonStr(d);
+            return ServerSentEvent.<String>builder()
+                    .event("message")
+                    .data(dataJson)
+                    .build();
+        });
+        // done 事件, 当 rawFlux 完成时，发送一个 done 事件通知前端
+        Flux<ServerSentEvent<String>> done = Flux.just(ServerSentEvent.<String>builder()
+                .event("done")
+                .data("")
+                .build());
+        // 拼接 + error 事件, 当 rawFlux 发生错误时，发送一个 error 事件通知前端
+        return Flux.concat(message, done)
+                .onErrorResume(e -> {
+                    // error 事件, 当 rawFlux 发生错误时，发送一个 error 事件通知前端
+                    String errorJson = JSONUtil.toJsonStr(Map.of("e", e.getMessage()));
+                    ServerSentEvent<String> errorEvent = ServerSentEvent.<String>builder()
+                            .event("error")
+                            .data(errorJson)
+                            .build();
+                    return Mono.just(errorEvent);
+                });
+    }
 
     /**
      * 创建应用
@@ -235,10 +285,6 @@ public class AppController {
         return ResultUtils.success(appVOPage);
     }
 
-    // endregion
-
-    // region 管理员功能
-
     /**
      * 根据 id 删除任意应用（管理员）
      *
@@ -314,6 +360,4 @@ public class AppController {
         
         return ResultUtils.success(app);
     }
-
-    // endregion
 }

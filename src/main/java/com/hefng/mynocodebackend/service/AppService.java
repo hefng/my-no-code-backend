@@ -2,9 +2,11 @@ package com.hefng.mynocodebackend.service;
 
 import com.hefng.mynocodebackend.model.dto.app.AppQueryRequest;
 import com.hefng.mynocodebackend.model.entity.App;
+import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.vo.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -14,6 +16,16 @@ import java.util.List;
  * @author https://github.com/hefng
  */
 public interface AppService extends IService<App> {
+
+    /**
+     * 调用 AI 生成代码
+     *
+     * @param appId 应用id
+     * @param userMessage 用户输入的消息
+     * @param loginUser 当前登录用户
+     * @return AI 生成的代码流
+     */
+    Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser);
 
     /**
      * 获取应用视图对象

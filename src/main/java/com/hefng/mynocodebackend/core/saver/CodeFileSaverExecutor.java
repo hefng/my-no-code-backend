@@ -26,13 +26,13 @@ public class CodeFileSaverExecutor {
       * @param codeTypeEnum 代码类型枚举, 如 HTML、MULTI_FILE 等
       * @return
       */
-     public static File saveCodeFile(Object content, CodegenTypeEnum codeTypeEnum) {
+     public static File saveCodeFile(Object content, CodegenTypeEnum codeTypeEnum, Long appId) {
           if (codeTypeEnum == null) {
                throw new IllegalArgumentException("代码类型不能为空");
           }
           return switch (codeTypeEnum) {
-               case HTML -> HTML_CODE_SAVER.saveCodeFile((HTMLCodeResult) content);
-               case MULTI_FILE -> MULTI_FILE_CODE_SAVER.saveCodeFile((MultiFileCodeResult) content);
+               case HTML -> HTML_CODE_SAVER.saveCodeFile((HTMLCodeResult) content, appId);
+               case MULTI_FILE -> MULTI_FILE_CODE_SAVER.saveCodeFile((MultiFileCodeResult) content, appId);
           };
      }
 }
