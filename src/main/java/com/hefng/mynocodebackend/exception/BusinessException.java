@@ -2,6 +2,7 @@ package com.hefng.mynocodebackend.exception;
 
 
 import com.hefng.mynocodebackend.common.ErrorCode;
+import lombok.Getter;
 
 /**
  * 自定义异常类
@@ -9,6 +10,7 @@ import com.hefng.mynocodebackend.common.ErrorCode;
  * @author <a href="https://github.com/liyupi">程序员鱼皮</a>
  * @from <a href="https://yupi.icu">编程导航知识星球</a>
  */
+@Getter
 public class BusinessException extends RuntimeException {
 
     /**
@@ -31,7 +33,4 @@ public class BusinessException extends RuntimeException {
         this.code = errorCode.getCode();
     }
 
-    public int getCode() {
-        return code;
-    }
 }
