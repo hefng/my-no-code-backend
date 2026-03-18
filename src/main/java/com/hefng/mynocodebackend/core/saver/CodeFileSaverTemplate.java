@@ -3,6 +3,7 @@ package com.hefng.mynocodebackend.core.saver;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import com.hefng.mynocodebackend.common.ErrorCode;
+import com.hefng.mynocodebackend.constant.AppConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
 
 import java.io.File;
@@ -13,9 +14,6 @@ import java.io.File;
  * @author hefng
  */
 public abstract class CodeFileSaverTemplate<T> {
-
-    // 默认保存路径, 项目根目录下的 tmp 文件夹 D:\develop\workspace\my-no-code-backend\tmp\
-    protected static final String DEFAULT_SAVE_PATH = System.getProperty("user.dir") + "\\tmp\\";
 
     /**
      * 保存代码文件的模板方法, 定义了保存代码文件的基本流程
@@ -58,7 +56,7 @@ public abstract class CodeFileSaverTemplate<T> {
      */
     private String buildUniqueFilePath(Long appId) {
         String uniqueFileName = getType() + "_" + appId;
-        String uniqueFilePath = DEFAULT_SAVE_PATH + "codegen" + File.separator + uniqueFileName;
+        String uniqueFilePath = AppConstant.CODEGEN_DIR + File.separator + uniqueFileName;
         FileUtil.mkdir(uniqueFilePath);
         return uniqueFilePath;
     }

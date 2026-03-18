@@ -1,6 +1,5 @@
 package com.hefng.mynocodebackend.controller;
 
-import cn.hutool.core.util.RandomUtil;
 import cn.hutool.json.JSONUtil;
 import com.hefng.mynocodebackend.annotation.AuthCheck;
 import com.hefng.mynocodebackend.common.BaseResponse;
@@ -11,10 +10,7 @@ import com.hefng.mynocodebackend.constant.AppConstant;
 import com.hefng.mynocodebackend.constant.UserConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.exception.ThrowUtils;
-import com.hefng.mynocodebackend.model.dto.app.AppAddRequest;
-import com.hefng.mynocodebackend.model.dto.app.AppQueryRequest;
-import com.hefng.mynocodebackend.model.dto.app.AppUpdateMyRequest;
-import com.hefng.mynocodebackend.model.dto.app.AppUpdateRequest;
+import com.hefng.mynocodebackend.model.dto.app.*;
 import com.hefng.mynocodebackend.model.entity.App;
 import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.vo.AppVO;
@@ -32,8 +28,6 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.awt.*;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -100,6 +94,26 @@ public class AppController {
     }
 
     /**
+     * 部署应用
+     *
+     * @param appDeployedRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployedApp(@RequestBody AppDeployedRequest appDeployedRequest, HttpServletRequest request) {
+        // 校验参数
+        ThrowUtils.throwIf(appDeployedRequest == null, ErrorCode.PARAMS_ERROR);
+        Long appId = appDeployedRequest.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        // 部署应用
+        String deployedUrl = appService.deployApp(appId, loginUser);
+        return ResultUtils.success(deployedUrl);
+    }
+
+    /**
      * 创建应用
      *
      * @param appAddRequest
@@ -124,7 +138,7 @@ public class AppController {
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
         app.setAppOwnerId(loginUser.getId());
-        
+
         boolean result = appService.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         

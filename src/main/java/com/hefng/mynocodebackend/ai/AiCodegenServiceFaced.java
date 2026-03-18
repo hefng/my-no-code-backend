@@ -79,15 +79,15 @@ public class AiCodegenServiceFaced {
      */
     public Flux<String> processCodeStream(Flux<String> result, CodegenTypeEnum codegenTypeEnum, Long appId) {
         // 由于是流式输出，我们需要在流完成时对接收到的代码进行解析和保存，因此我们使用 doOnNext 和 doOnComplete 来处理流中的数据
-        StringBuilder multiFileCodeBuilder = new StringBuilder();
-        return result.doOnNext(multiFileCodeBuilder::append).doOnComplete(() -> {
+        StringBuilder codeBuilder = new StringBuilder();
+        return result.doOnNext(codeBuilder::append).doOnComplete(() -> {
             try {
-                // 解析 multiFileCodeBuilder 中的代码，提取 HTML、CSS、JS 代码
-                String multiFileCode = multiFileCodeBuilder.toString();
-                CodeParserExecutor.parseCode(multiFileCode, codegenTypeEnum);
+                // 解析代码
+                String code = codeBuilder.toString();
+                Object parseResult = CodeParserExecutor.parseCode(code, codegenTypeEnum);
                 // 保存代码到文件
-                File file = CodeFileSaverExecutor.saveCodeFile(multiFileCode, codegenTypeEnum, appId);
-                log.info("多文件代码生成并保存完成，保存路径: {}", file.getAbsolutePath());
+                File file = CodeFileSaverExecutor.saveCodeFile(parseResult, codegenTypeEnum, appId);
+                log.info("代码生成并保存完成，保存路径: {}", file.getAbsolutePath());
             } catch (Exception e) {
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "多文件代码生成失败: " + e.getMessage());
             }

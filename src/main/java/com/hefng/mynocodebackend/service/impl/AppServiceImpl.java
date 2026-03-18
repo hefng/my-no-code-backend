@@ -1,9 +1,15 @@
 package com.hefng.mynocodebackend.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IORuntimeException;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import com.hefng.mynocodebackend.ai.AiCodegenServiceFaced;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.common.ErrorCode;
+import com.hefng.mynocodebackend.constant.AppConstant;
 import com.hefng.mynocodebackend.constant.CommonConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.exception.ThrowUtils;
@@ -24,6 +30,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.io.File;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +68,58 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 3. 调用 AI 生成代码 返回 AI 生成的代码流
         return aiCodegenServiceFaced.generateAndSaveCodeWithStream(userMessage, CodegenTypeEnum.HTML, appId);
     }
+
+    /**
+     * 部署应用
+     *
+     * @param appId 应用id
+     * @param loginUser 当前登录用户
+     * @return
+     */
+    @Override
+    public String deployApp(Long appId, User loginUser) {
+        // 1. 参数校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
+
+        // 2. 获取应用信息
+        App app = getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+
+        // 3. 校验用户是否能够部署该应用
+        ThrowUtils.throwIf(!app.getAppOwnerId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限部署该应用");
+
+        // 4. 校验应用是否已经部署
+        String deployedKey = app.getDeployedKey();
+        if (StrUtil.isBlank(deployedKey)) {
+            deployedKey = IdUtil.getSnowflakeNextIdStr();
+        }
+
+        // 5. 构建源文件目录
+        String codegenType = app.getCodegenType();
+        String srcPath = AppConstant.CODEGEN_DIR + File.separator + codegenType + "_" + appId;
+
+        // 6. 校验源文件目录是否存在
+        File srcFile = new File(srcPath);
+        ThrowUtils.throwIf(!srcFile.exists(), ErrorCode.NOT_FOUND_ERROR, "源文件不存在，无法部署");
+
+        // 7. 将源文件目录下的文件复制到部署目录
+        String deployPath = AppConstant.DEPLOY_DIR + File.separator + deployedKey;
+        try {
+            FileUtil.copyContent(srcFile, new File(deployPath), true);
+        } catch (IORuntimeException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署失败，复制文件出错");
+        }
+
+        // 8. 更新应用的 deployedKey 和 deployedTime
+        app.setDeployedKey(deployedKey);
+        app.setDeployedTime(LocalDateTime.now());
+        boolean success = updateById(app);
+        ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "部署失败，更新应用信息失败");
+
+        // 9. 返回可访问的 URL 地址
+        return AppConstant.CODE_DEPLOY_HOST + deployedKey;
+    }
+
 
     @Override
     public AppVO getAppVO(App app) {
