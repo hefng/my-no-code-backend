@@ -125,11 +125,6 @@ public class AppController {
         BeanUtils.copyProperties(appAddRequest, app);
         app.setAppOwnerId(loginUser.getId());
         
-        // 生成唯一的部署key
-        String deployedKey = RandomUtil.randomString(16);
-        app.setDeployedKey(deployedKey);
-        app.setDeployedTime(LocalDateTime.now());
-        
         boolean result = appService.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         
