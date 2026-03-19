@@ -62,6 +62,12 @@ public class App implements Serializable {
     private String codegenType;
 
     /**
+     * 初始提示词
+     */
+    @Column("initPrompt")
+    private String initPrompt;
+
+    /**
      * 部署key
      */
     @Column("deployedKey")

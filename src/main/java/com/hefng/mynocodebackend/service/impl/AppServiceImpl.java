@@ -65,7 +65,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
         ThrowUtils.throwIf(!app.getAppOwnerId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
 
-        // 3. 调用 AI 生成代码 返回 AI 生成的代码流
+        // 3. 如果用户输入的消息为空，使用应用的 initPrompt 作为用户输入的消息
+        String initPrompt = app.getInitPrompt();
+        if (StrUtil.isBlank(userMessage)) {
+            // 为空代表第一次对话，使用应用的 initPrompt 作为用户输入的消息
+            userMessage = initPrompt;
+        }
+
+        // 4. 调用 AI 生成代码 返回 AI 生成的代码流
+        // todo 暂时默认使用 HTML 生成, 后续可以根据 app.getCodegenType() 来动态判断生成的代码类型
         return aiCodegenServiceFaced.generateAndSaveCodeWithStream(userMessage, CodegenTypeEnum.HTML, appId);
     }
 

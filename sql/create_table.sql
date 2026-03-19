@@ -30,6 +30,7 @@ create table if not exists app
     appDesc      varchar(512)                           null comment '应用描述',
     appCover     varchar(1024)                          not null comment '应用封面',
     codegenType  varchar(256)                           not null comment '代码生成类型',
+    initPrompt   varchar(512)                           not null comment '初始提示词',
     deployedKey  varchar(256)                           null comment '部署key',
     deployedTime datetime                               null comment '部署时间',
     appOwnerId   bigint                                 not null comment '应用所有者id',

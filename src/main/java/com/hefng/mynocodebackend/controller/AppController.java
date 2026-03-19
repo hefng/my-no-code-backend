@@ -138,6 +138,7 @@ public class AppController {
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
         app.setAppOwnerId(loginUser.getId());
+        app.setAppName(app.getInitPrompt().substring(0, 12)); // 暂时使用初始化提示的前12个字符作为应用名称
 
         boolean result = appService.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
