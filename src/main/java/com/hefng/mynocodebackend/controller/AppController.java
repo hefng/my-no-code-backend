@@ -20,6 +20,7 @@ import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.MediaType;
@@ -38,6 +39,7 @@ import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
  *
  * @author https://github.com/hefng
  */
+@Slf4j
 @RestController
 @RequestMapping("/app")
 public class AppController {
@@ -80,17 +82,8 @@ public class AppController {
                 .event("done")
                 .data("")
                 .build());
-        // 拼接 + error 事件, 当 rawFlux 发生错误时，发送一个 error 事件通知前端
-        return Flux.concat(message, done)
-                .onErrorResume(e -> {
-                    // error 事件, 当 rawFlux 发生错误时，发送一个 error 事件通知前端
-                    String errorJson = JSONUtil.toJsonStr(Map.of("e", e.getMessage()));
-                    ServerSentEvent<String> errorEvent = ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data(errorJson)
-                            .build();
-                    return Mono.just(errorEvent);
-                });
+        // 拼接
+        return Flux.concat(message, done);
     }
 
     /**
@@ -125,12 +118,10 @@ public class AppController {
         if (appAddRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        
-        // 校验参数
-        String appName = appAddRequest.getAppName();
-        String codegenType = appAddRequest.getCodegenType();
-        if (StringUtils.isAnyBlank(appName, codegenType)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "应用名称和代码生成类型不能为空");
+
+        String initPrompt = appAddRequest.getInitPrompt();
+        if (StringUtils.isBlank(initPrompt)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "初始化提示不能为空");
         }
         
         User loginUser = userService.getLoginUser(request);
@@ -138,9 +129,20 @@ public class AppController {
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
         app.setAppOwnerId(loginUser.getId());
-        app.setAppName(app.getInitPrompt().substring(0, 12)); // 暂时使用初始化提示的前12个字符作为应用名称
+        app.setAppName(initPrompt.substring(0, 4)); // 暂时使用初始化提示的前12个字符作为应用名称
+        app.setPriority(AppConstant.DEFAULT_PRIORITY);
+        String codegenType = app.getCodegenType();
+        if (codegenType == null) {
+            app.setCodegenType(AppConstant.DEFAULT_CODEGEN_TYPE); // 默认生成 HTML 代码
+        }
 
-        boolean result = appService.save(app);
+        boolean result = false;
+        try {
+            result = appService.save(app);
+        } catch (Exception e) {
+            log.error("保存应用失败", e);
+            throw new RuntimeException(e);
+        }
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         
         return ResultUtils.success(app.getId());
@@ -214,11 +216,13 @@ public class AppController {
     /**
      * 根据 id 查看应用详情
      *
-     * @param id
+     * @param appQueryRequest
      * @return
      */
     @GetMapping("/get/vo")
-    public BaseResponse<AppVO> getAppVOById(long id) {
+    public BaseResponse<AppVO> getAppVOById(@RequestBody AppQueryRequest appQueryRequest) {
+        ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
+        Long id = appQueryRequest.getId();
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }

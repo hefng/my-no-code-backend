@@ -24,4 +24,5 @@ public interface AppConstant {
     String CODE_DEPLOY_HOST = "http://localhost/";
 
 
+    String DEFAULT_CODEGEN_TYPE = "html";
 }
