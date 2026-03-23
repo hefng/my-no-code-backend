@@ -26,6 +26,9 @@ public class AiCodegenServiceFaced {
     @Resource
     private AiCodegenService aiCodegenService;
 
+    @Resource
+    private AiCodegenStreamService aiCodegenStreamService;
+
     /**
      * 根据用户输入的需求生成代码并保存到文件
      * @param userMessage 用户输入的需求描述
@@ -60,11 +63,11 @@ public class AiCodegenServiceFaced {
         }
         return switch (codegenTypeEnum) {
             case HTML -> {
-                Flux<String> result = aiCodegenService.generateHtmlStream(userMessage);
+                Flux<String> result = aiCodegenStreamService.generateHtmlStream(userMessage);
                 yield processCodeStream(result, CodegenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> result = aiCodegenService.generateMultiFileCodeStream(userMessage);
+                Flux<String> result = aiCodegenStreamService.generateMultiFileCodeStream(userMessage);
                 yield processCodeStream(result, CodegenTypeEnum.MULTI_FILE, appId);
             }
         };
