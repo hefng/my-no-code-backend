@@ -14,7 +14,7 @@ import java.util.Map;
  */
 public class MybatisFlexCodegen {
 
-    public static final String CREATE_TABLE = "app";
+    public static final String CREATE_TABLE = "chat_history";
 
     public static void main(String[] args) {
         Dict dict = YamlUtil.loadByPath("application.yml");

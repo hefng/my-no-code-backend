@@ -42,3 +42,19 @@ create table if not exists app
     index idx_appOwnerId (appOwnerId),
     unique index idx_deployedKey (deployedKey)
 ) comment '应用' collate = utf8mb4_unicode_ci;
+
+-- 历史对话表
+create table if not exists chat_history
+(
+    id           bigint auto_increment comment 'id' primary key,
+    appId        bigint                                 not null comment '应用id',
+    userId       bigint                                 not null comment '用户id',
+    messages      text                                   null comment '对话消息列表',
+    chatMessageType varchar(32)                           null comment '对话消息类型(user/ai)',
+    createTime   datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
+    updateTime   datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    isDelete     tinyint      default 0                 not null comment '是否删除',
+    index idx_appId (appId),
+    index idx_userId (userId),
+    index idx_appId_createTime (appId, createTime)
+) comment '历史对话' collate = utf8mb4_unicode_ci;

@@ -13,8 +13,10 @@ import com.hefng.mynocodebackend.exception.ThrowUtils;
 import com.hefng.mynocodebackend.model.dto.app.*;
 import com.hefng.mynocodebackend.model.entity.App;
 import com.hefng.mynocodebackend.model.entity.User;
+import com.hefng.mynocodebackend.model.enums.ChatMessageTypeEnum;
 import com.hefng.mynocodebackend.model.vo.AppVO;
 import com.hefng.mynocodebackend.service.AppService;
+import com.hefng.mynocodebackend.service.ChatHistoryService;
 import com.hefng.mynocodebackend.service.UserService;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -50,6 +52,9 @@ public class AppController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private ChatHistoryService chatHistoryService;
+
     /**
      * 调用 AI 生成代码
      *
@@ -67,16 +72,35 @@ public class AppController {
         ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
 
         User loginUser = userService.getLoginUser(request);
+
+        // 在调用服务生成代码之前，可以先保存用户的输入消息到对话历史中，方便后续查看和分析
+        chatHistoryService.saveChatMessage(appId, loginUser.getId(), userMessage, ChatMessageTypeEnum.USER.getValue());
+        
         Flux<String> rawFlux = appService.chatToGenCode(appId, userMessage, loginUser);
+        // 用于收集完整 AI 回答
+        StringBuilder aiResponseBuilder = new StringBuilder();
         // 增量事件, 每当 rawFlux 产生一个新的代码块时，就将其包装成一个 ServerSentEvent 发送给前端
-        Flux<ServerSentEvent<String>> message = rawFlux.map(chunk -> {
-            Map<String, String> d = Map.of("d", chunk);
-            String dataJson = JSONUtil.toJsonStr(d);
-            return ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data(dataJson)
-                    .build();
-        });
+        Flux<ServerSentEvent<String>> message = rawFlux
+                .doOnNext(aiResponseBuilder::append)
+                .doOnComplete(() -> {
+                    // 流结束后保存 AI 回答到对话历史
+                    String aiResponse = aiResponseBuilder.toString();
+                    if (org.apache.commons.lang3.StringUtils.isNotBlank(aiResponse)) {
+                        try {
+                            chatHistoryService.saveChatMessage(appId, loginUser.getId(), aiResponse, ChatMessageTypeEnum.AI.getValue());
+                        } catch (Exception e) {
+                            log.error("保存 AI 回答到对话历史失败, appId={}", appId, e);
+                        }
+                    }
+                })
+                .map(chunk -> {
+                    Map<String, String> d = Map.of("d", chunk);
+                    String dataJson = JSONUtil.toJsonStr(d);
+                    return ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data(dataJson)
+                            .build();
+                });
         // done 事件, 当 rawFlux 完成时，发送一个 done 事件通知前端
         Flux<ServerSentEvent<String>> done = Flux.just(ServerSentEvent.<String>builder()
                 .event("done")
@@ -209,7 +233,7 @@ public class AppController {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         
-        boolean result = appService.removeById(appId);
+        boolean result = appService.deleteAppWithHistory(appId);
         return ResultUtils.success(result);
     }
 
@@ -312,7 +336,7 @@ public class AppController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         
-        boolean result = appService.removeById(deleteRequest.getId());
+        boolean result = appService.deleteAppWithHistory(deleteRequest.getId());
         return ResultUtils.success(result);
     }
 

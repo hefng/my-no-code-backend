@@ -59,4 +59,12 @@ public interface AppService extends IService<App> {
      * @return
      */
     QueryWrapper getQueryWrapper(AppQueryRequest appQueryRequest);
+
+    /**
+     * 删除应用并关联删除其所有对话历史
+     *
+     * @param appId 应用id
+     * @return 是否成功
+     */
+    boolean deleteAppWithHistory(Long appId);
 }

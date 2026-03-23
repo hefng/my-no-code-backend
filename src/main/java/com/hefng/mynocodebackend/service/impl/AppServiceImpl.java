@@ -4,7 +4,6 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IORuntimeException;
 import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hefng.mynocodebackend.ai.AiCodegenServiceFaced;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
@@ -20,11 +19,13 @@ import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.vo.AppVO;
 import com.hefng.mynocodebackend.model.vo.UserVO;
 import com.hefng.mynocodebackend.service.AppService;
+import com.hefng.mynocodebackend.service.ChatHistoryService;
 import com.hefng.mynocodebackend.service.UserService;
 import com.hefng.mynocodebackend.utils.SqlUtils;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
  *
  * @author https://github.com/hefng
  */
+@Slf4j
 @Service
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
@@ -53,6 +55,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private AiCodegenServiceFaced aiCodegenServiceFaced;
+
+    @Resource
+    private ChatHistoryService chatHistoryService;
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
@@ -207,5 +212,14 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
 
         return queryWrapper;
+    }
+
+    @Override
+    public boolean deleteAppWithHistory(Long appId) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
+        // 先关联删除对话历史
+        chatHistoryService.removeByAppId(appId);
+        // 再删除应用本身
+        return this.removeById(appId);
     }
 }
