@@ -36,8 +36,8 @@ public class AiCodeGeneratorServiceFactory {
         // 加载历史对话到内存
         chatHistoryService.loadChatHistoryToMemory(appId, memory, 20);
         return AiServices.builder(AiCodegenService.class)
-                .chatModel(chatModel)
                 .chatMemory(memory)
+                .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .build();
     }

@@ -5,6 +5,11 @@ import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.ai.model.HTMLCodeResult;
 import com.hefng.mynocodebackend.ai.model.MultiFileCodeResult;
 import com.hefng.mynocodebackend.core.CodeFileSaver;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -21,6 +26,9 @@ class AiCodegenServiceTest {
 
     @Resource
     private AiCodegenServiceFaced aiCodegenServiceFaced;
+
+    @Resource
+    private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
     @Test
     void generateHTML() {
