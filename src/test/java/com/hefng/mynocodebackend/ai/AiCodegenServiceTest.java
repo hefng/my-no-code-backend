@@ -24,9 +24,22 @@ class AiCodegenServiceTest {
 
     @Test
     void generateHTML() {
-        HTMLCodeResult htmlCodeResult = aiCodegenService.generateHtml("请帮我生成一个简单的个人博客首页, 不超过50行代码");
+        HTMLCodeResult htmlCodeResult = aiCodegenService.generateHtml("请帮我生成一个简单的个人博客首页, 不超过50行代码", 1L);
         System.out.println(htmlCodeResult);
     }
+
+    @Test
+    void testChatMemory() {
+        HTMLCodeResult result = aiCodegenService.generateHtml("做个程序员鱼皮的工具网站，总代码量不超过 20 行", 1L);
+        Assertions.assertNotNull(result);
+        result = aiCodegenService.generateHtml("不要生成网站，告诉我你刚刚做了什么？", 1L);
+        Assertions.assertNotNull(result);
+        result = aiCodegenService.generateHtml("做个程序员鱼皮的工具网站，总代码量不超过 20 行", 2L);
+        Assertions.assertNotNull(result);
+        result = aiCodegenService.generateHtml("不要生成网站，告诉我你刚刚做了什么？", 2L);
+        Assertions.assertNotNull(result);
+    }
+
 
     @Test
     void generateMultiFileCode() {
@@ -36,7 +49,7 @@ class AiCodegenServiceTest {
 
     @Test
     void generateHtmlStream() {
-        Flux<String> codeStream = aiCodegenServiceFaced.generateAndSaveCodeWithStream("请帮我生成一个简单的个人博客首页, 不超过50行代码", CodegenTypeEnum.HTML);
+        Flux<String> codeStream = aiCodegenServiceFaced.generateAndSaveCodeWithStream("请帮我生成一个简单的个人博客首页, 不超过50行代码", CodegenTypeEnum.HTML, 1L);
         List<String> result = codeStream.collectList().block();
         Assertions.assertNotNull(result);
         String HtmlResult = String.join("", result);

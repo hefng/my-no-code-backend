@@ -27,7 +27,7 @@ public class AiCodegenServiceFaced {
     private AiCodegenService aiCodegenService;
 
     @Resource
-    private AiCodegenStreamService aiCodegenStreamService;
+    private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
     /**
      * 根据用户输入的需求生成代码并保存到文件
@@ -41,7 +41,7 @@ public class AiCodegenServiceFaced {
         }
         return switch (codegenTypeEnum) {
             case HTML -> {
-                HTMLCodeResult htmlCodeResult = aiCodegenService.generateHtml(userMessage);
+                HTMLCodeResult htmlCodeResult = aiCodegenService.generateHtml(userMessage, 1L);
                 yield CodeFileSaverExecutor.saveCodeFile(htmlCodeResult, CodegenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
@@ -61,13 +61,14 @@ public class AiCodegenServiceFaced {
         if (codegenTypeEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "代码生成类型不能为空");
         }
+        AiCodegenService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
         return switch (codegenTypeEnum) {
             case HTML -> {
-                Flux<String> result = aiCodegenStreamService.generateHtmlStream(userMessage);
+                Flux<String> result = aiCodeGeneratorService.generateHtmlStream(userMessage);
                 yield processCodeStream(result, CodegenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> result = aiCodegenStreamService.generateMultiFileCodeStream(userMessage);
+                Flux<String> result = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
                 yield processCodeStream(result, CodegenTypeEnum.MULTI_FILE, appId);
             }
         };
@@ -89,10 +90,9 @@ public class AiCodegenServiceFaced {
                 String code = codeBuilder.toString();
                 Object parseResult = CodeParserExecutor.parseCode(code, codegenTypeEnum);
                 // 保存代码到文件
-                File file = CodeFileSaverExecutor.saveCodeFile(parseResult, codegenTypeEnum, appId);
-                log.info("代码生成并保存完成，保存路径: {}", file.getAbsolutePath());
+                CodeFileSaverExecutor.saveCodeFile(parseResult, codegenTypeEnum, appId);
             } catch (Exception e) {
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, "多文件代码生成失败: " + e.getMessage());
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "代码生成失败: " + e.getMessage());
             }
         });
     }

@@ -6,6 +6,7 @@ import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.vo.ChatHistoryVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 
 import java.util.List;
 
@@ -26,6 +27,15 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @return 保存的记录id
      */
     Long saveChatMessage(Long appId, Long userId, String messages, String chatMessageType);
+
+    /**
+     * 加载应用的对话历史到内存（供对话记忆使用）
+     * @param appId
+     * @param chatMemory
+     * @param maxCount
+     * @return
+     */
+    int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount);
 
     /**
      * 加载应用最新的一页对话历史（进入页面时调用）

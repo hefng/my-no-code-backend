@@ -12,7 +12,7 @@ public class HtmlCodeFileSaver extends CodeFileSaverTemplate<HTMLCodeResult> {
     protected File writeToFile(String uniquePath, HTMLCodeResult content) {
         String htmlCode = content.getHtmlCode();
         if (htmlCode == null || htmlCode.isEmpty()) {
-            throw new IllegalArgumentException("HTML 代码内容不能为空");
+            return null;
         }
         String filePath = uniquePath + File.separator + "index.html";
         FileUtil.writeString(htmlCode, filePath, "UTF-8");

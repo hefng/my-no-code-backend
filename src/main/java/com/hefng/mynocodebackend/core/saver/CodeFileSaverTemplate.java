@@ -1,10 +1,7 @@
 package com.hefng.mynocodebackend.core.saver;
 
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.IdUtil;
-import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.constant.AppConstant;
-import com.hefng.mynocodebackend.exception.BusinessException;
 
 import java.io.File;
 
@@ -45,9 +42,7 @@ public abstract class CodeFileSaverTemplate<T> {
      * 校验代码生成结果对象是否合法
      */
     private void validResult(T result) {
-        if (result == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "代码生成结果不能为空");
-        }
+        // todo 可以在这里添加一些通用的校验逻辑
     }
 
     /**
