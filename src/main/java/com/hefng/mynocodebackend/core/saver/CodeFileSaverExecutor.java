@@ -33,6 +33,8 @@ public class CodeFileSaverExecutor {
           return switch (codeTypeEnum) {
                case HTML -> HTML_CODE_SAVER.saveCodeFile((HTMLCodeResult) content, appId);
                case MULTI_FILE -> MULTI_FILE_CODE_SAVER.saveCodeFile((MultiFileCodeResult) content, appId);
+               // VUE_PROJECT 的文件由 AI 通过 @Tool 直接写入，此处无需操作
+               case VUE_PROJECT -> null;
           };
      }
 }

@@ -6,13 +6,14 @@ server:
       cookie:
         max-age: 2592000 # 30天，单位为秒
 spring:
-  session:
-    timeout: 2592000 # 30天，单位为秒
-    store-type: redis
   servlet:
     multipart:
       # 最大文件上传体积 2MB
       max-file-size: 2MB
+  mvc:
+    async:
+      # 异步请求超时时间，-1 表示不超时（SSE 长连接需要）
+      request-timeout: -1
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/my_nocode_backend
@@ -25,6 +26,10 @@ spring:
       port: 6379
       password: 123456
       ttl: 3600
+      database: 1
+  session:
+    timeout: 2592000 # 30天，单位为秒
+    store-type: redis
   profiles:
     active: local
 # springdoc-openapi
@@ -41,21 +46,20 @@ knife4j:
 #langchain4j:
 #  open-ai:
 #    chat-model:
-#      base-url: https://api.deepseek.com
-#      api-key: "sk-ee7bd46aa4e54b84a6e47e937a30a7f9"
-#      model-name: deepseek-chat
+#      base-url: https://open.bigmodel.cn/api/paas/v4
+#      api-key: "<Your API Key>"
+#      model-name: glm-4.6
 #      log-requests: true
 #      log-responses: true
-#      max-tokens: 8192
-#      temperature: 0.4
-#      strict-json-schema: true
-#      response-format: json_object
+#      max-tokens: 16384
 #    streaming-chat-model:
-#      base-url: https://api.deepseek.com
-#      api-key: "sk-ee7bd46aa4e54b84a6e47e937a30a7f9"
-#      model-name: deepseek-chat
+#      base-url: https://open.bigmodel.cn/api/paas/v4
+#      api-key: "<Your API Key>"
+#      model-name: glm-4.7-flash
 #      log-requests: true
 #      log-responses: true
-#      max-tokens: 8192
-#      temperature: 0.4
-
+#      max-tokens: 16384
+#  memory:
+#    max-messages: 20
+#    redis-key-prefix: "lc4j:chat_memory:"
+#    ttl-seconds: 604800 # 7天

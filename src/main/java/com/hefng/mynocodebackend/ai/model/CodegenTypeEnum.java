@@ -13,7 +13,8 @@ public enum CodegenTypeEnum {
 
 
     HTML("html", "html代码生成"),
-    MULTI_FILE("multi_file", "管理员用户");
+    MULTI_FILE("multi_file", "多文件代码生成"),
+    VUE_PROJECT("vue_project", "Vue工程化项目生成");
 
     private final String type;
     private final String description;

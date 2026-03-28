@@ -17,6 +17,8 @@ public class CodeParserExecutor {
           return switch (codeTypeEnum) {
                case HTML -> HTML_CODE_PARSER.parseCode(content);
                case MULTI_FILE -> MULTI_FILE_CODE_PARSER.parseCode(content);
+               // VUE_PROJECT 的文件由 AI 通过 @Tool 直接写入，无需后端解析代码块
+               case VUE_PROJECT -> null;
           };
      }
 }

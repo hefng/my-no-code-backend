@@ -32,7 +32,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Map;
 
 import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
 
@@ -56,16 +55,24 @@ public class AppController {
     private ChatHistoryService chatHistoryService;
 
     /**
-     * 调用 AI 生成代码
+     * 调用 AI 生成代码（流式 SSE）
+     * <p>
+     * SSE 事件类型说明（前端通过 event 字段区分）：
+     * - message：HTML/MULTI_FILE 生成的代码片段，data 格式为 {"d": "代码片段"}
+     * - thought：Vue 工程化深度推理模型的思考过程片段，data 格式为 {"event":"thought","d":"内容"}
+     * - answer：Vue 工程化最终答案片段，data 格式为 {"event":"answer","d":"内容"}
+     * - done：流结束信号，前端收到后关闭 EventSource 连接
      *
-     * @param appId
-     * @param userMessage
-     * @param request
-     * @return
+     * @param appId       应用 id
+     * @param userMessage 用户输入的消息
+     * @param codegenType 可选，生成代码类型（html/multi_file/vue_project）；传入时覆盖应用原有类型并持久化
+     * @param request     HTTP 请求
+     * @return SSE 事件流
      */
     @GetMapping(value = "chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                       @RequestParam String userMessage,
+                                                      @RequestParam String codegenType,
                                                       HttpServletRequest request) {
         // 校验参数
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
@@ -73,19 +80,36 @@ public class AppController {
 
         User loginUser = userService.getLoginUser(request);
 
-        // 在调用服务生成代码之前，可以先保存用户的输入消息到对话历史中，方便后续查看和分析
+        // 在调用服务生成代码之前，先保存用户的输入消息到对话历史中
         chatHistoryService.saveChatMessage(appId, loginUser.getId(), userMessage, ChatMessageTypeEnum.USER.getValue());
-        
-        Flux<String> rawFlux = appService.chatToGenCode(appId, userMessage, loginUser);
-        // 用于收集完整 AI 回答
+
+        Flux<String> rawFlux = appService.chatToGenCode(appId, userMessage, codegenType, loginUser);
+
+        // 用于收集完整 AI 回答（思考过程 + 最终答案），流结束后一并保存到对话历史
         StringBuilder aiResponseBuilder = new StringBuilder();
-        // 增量事件, 每当 rawFlux 产生一个新的代码块时，就将其包装成一个 ServerSentEvent 发送给前端
-        Flux<ServerSentEvent<String>> message = rawFlux
-                .doOnNext(aiResponseBuilder::append)
+
+        // 将原始流的每个 JSON chunk 转换为 SSE 事件
+        // 核心逻辑：从 chunk 中解析 event 字段，决定 SSE event 名称
+        // - Vue 工程化：chunk 格式为 {"event":"thought"|"answer","d":"..."} → SSE event = thought/answer
+        // - HTML/MULTI_FILE：chunk 格式为 {"d":"..."} → SSE event = message（保持原有行为）
+        Flux<ServerSentEvent<String>> messageFlux = rawFlux
+                .doOnNext(chunk -> {
+                    // 收集原始内容用于保存对话历史（只收集 d 字段的内容，过滤掉 event 元数据）
+                    try {
+                        cn.hutool.json.JSONObject json = JSONUtil.parseObj(chunk);
+                        String d = json.getStr("d", "");
+                        if (!d.isEmpty()) {
+                            aiResponseBuilder.append(d);
+                        }
+                    } catch (Exception ignored) {
+                        // 解析失败时直接追加原始内容，避免丢失数据
+                        aiResponseBuilder.append(chunk);
+                    }
+                })
                 .doOnComplete(() -> {
-                    // 流结束后保存 AI 回答到对话历史
+                    // 流结束后保存 AI 完整回答到对话历史
                     String aiResponse = aiResponseBuilder.toString();
-                    if (org.apache.commons.lang3.StringUtils.isNotBlank(aiResponse)) {
+                    if (StringUtils.isNotBlank(aiResponse)) {
                         try {
                             chatHistoryService.saveChatMessage(appId, loginUser.getId(), aiResponse, ChatMessageTypeEnum.AI.getValue());
                         } catch (Exception e) {
@@ -94,20 +118,34 @@ public class AppController {
                     }
                 })
                 .map(chunk -> {
-                    Map<String, String> d = Map.of("d", chunk);
-                    String dataJson = JSONUtil.toJsonStr(d);
+                    // 解析 chunk 中的 event 字段，决定 SSE event 名称
+                    // Vue 工程化的 chunk 带有 event 字段；HTML 的 chunk 只有 d 字段
+                    String sseEvent = "message";
+                    try {
+                        cn.hutool.json.JSONObject json = JSONUtil.parseObj(chunk);
+                        String eventField = json.getStr("event");
+                        if (StringUtils.isNotBlank(eventField)) {
+                            // thought 或 answer 事件，直接使用 event 字段值作为 SSE event 名称
+                            sseEvent = eventField;
+                        }
+                    } catch (Exception ignored) {
+                        // 解析失败时降级为 message 事件
+                    }
                     return ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data(dataJson)
+                            .event(sseEvent)
+                            .data(chunk)
                             .build();
                 });
-        // done 事件, 当 rawFlux 完成时，发送一个 done 事件通知前端
-        Flux<ServerSentEvent<String>> done = Flux.just(ServerSentEvent.<String>builder()
-                .event("done")
-                .data("")
-                .build());
-        // 拼接
-        return Flux.concat(message, done);
+
+        // done 事件：流结束后通知前端关闭连接
+        Flux<ServerSentEvent<String>> doneFlux = Flux.just(
+                ServerSentEvent.<String>builder()
+                        .event("done")
+                        .data("")
+                        .build()
+        );
+
+        return Flux.concat(messageFlux, doneFlux);
     }
 
     /**

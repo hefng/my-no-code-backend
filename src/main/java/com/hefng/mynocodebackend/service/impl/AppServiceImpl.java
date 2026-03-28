@@ -60,7 +60,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private ChatHistoryService chatHistoryService;
 
     @Override
-    public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
+    public Flux<String> chatToGenCode(Long appId, String userMessage, String codegenType, User loginUser) {
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
         ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
@@ -73,13 +73,34 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 3. 如果用户输入的消息为空，使用应用的 initPrompt 作为用户输入的消息
         String initPrompt = app.getInitPrompt();
         if (StrUtil.isBlank(userMessage)) {
-            // 为空代表第一次对话，使用应用的 initPrompt 作为用户输入的消息
             userMessage = initPrompt;
         }
 
-        // 4. 调用 AI 生成代码 返回 AI 生成的代码流
-        // todo 暂时默认使用 HTML 生成, 后续可以根据 app.getCodegenType() 来动态判断生成的代码类型
-        return aiCodegenServiceFaced.generateAndSaveCodeWithStream(userMessage, CodegenTypeEnum.HTML, appId);
+        // 4. 若前端传入了 codegenType，校验合法性后覆盖应用原有类型并持久化
+        // 这样下次进入应用时预览 URL 和生成逻辑都能保持一致，不会出现类型漂移
+        if (StringUtils.isNotBlank(codegenType)) {
+            CodegenTypeEnum requestedType = CodegenTypeEnum.getByType(codegenType);
+            ThrowUtils.throwIf(requestedType == null, ErrorCode.PARAMS_ERROR,
+                    "不支持的代码生成类型: " + codegenType + "，合法值为 html/multi_file/vue_project");
+            // 仅在类型发生变化时才执行更新，避免无意义的 DB 写操作
+            if (!codegenType.equals(app.getCodegenType())) {
+                App updateApp = new App();
+                updateApp.setId(appId);
+                updateApp.setCodegenType(codegenType);
+                updateById(updateApp);
+                app.setCodegenType(codegenType);
+            }
+        }
+
+        // 5. 根据最终确定的 codegenType 路由到对应的生成策略
+        String finalCodegenType = app.getCodegenType();
+        CodegenTypeEnum codegenTypeEnum = CodegenTypeEnum.getByType(finalCodegenType);
+        if (codegenTypeEnum == null) {
+            // 兜底：未知类型默认走 HTML 生成，避免因配置错误导致整个请求失败
+            log.warn("未知的 codegenType={}，appId={}，降级为 HTML 生成", finalCodegenType, appId);
+            codegenTypeEnum = CodegenTypeEnum.HTML;
+        }
+        return aiCodegenServiceFaced.generateAndSaveCodeWithStream(userMessage, codegenTypeEnum, appId);
     }
 
     /**

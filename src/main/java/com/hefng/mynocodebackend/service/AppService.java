@@ -20,12 +20,13 @@ public interface AppService extends IService<App> {
     /**
      * 调用 AI 生成代码
      *
-     * @param appId 应用id
+     * @param appId       应用id
      * @param userMessage 用户输入的消息
-     * @param loginUser 当前登录用户
+     * @param codegenType 可选，生成代码类型（html/multi_file/vue_project）；传入时覆盖应用原有类型并持久化
+     * @param loginUser   当前登录用户
      * @return AI 生成的代码流
      */
-    Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser);
+    Flux<String> chatToGenCode(Long appId, String userMessage, String codegenType, User loginUser);
 
     /**
      * 部署应用
