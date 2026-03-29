@@ -65,7 +65,7 @@ public class AppController {
      *
      * @param appId       应用 id
      * @param userMessage 用户输入的消息
-     * @param codegenType 可选，生成代码类型（html/multi_file/vue_project）；传入时覆盖应用原有类型并持久化
+     * @param codegenType 可选，生成代码类型（html/multi-file/vue-project）；传入时覆盖应用原有类型并持久化
      * @param request     HTTP 请求
      * @return SSE 事件流
      */
@@ -281,7 +281,7 @@ public class AppController {
      * @param appQueryRequest
      * @return
      */
-    @GetMapping("/get/vo")
+    @PostMapping("/get/vo")
     public BaseResponse<AppVO> getAppVOById(@RequestBody AppQueryRequest appQueryRequest) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         Long id = appQueryRequest.getId();

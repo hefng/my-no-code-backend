@@ -26,7 +26,7 @@ public interface AppConstant {
 
     String DEFAULT_CODEGEN_TYPE = "html";
 
-    String MULTI_FILE_CODEGEN_TYPE = "multi_file";
+    String MULTI_FILE_CODEGEN_TYPE = "multi-file";
 
-    String VUE_PROJECT_CODEGEN_TYPE = "vue_project";
+    String VUE_PROJECT_CODEGEN_TYPE = "vue-project";
 }

@@ -1,15 +1,9 @@
 package com.hefng.mynocodebackend.ai;
 
-import cn.hutool.core.lang.Assert;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.ai.model.HTMLCodeResult;
 import com.hefng.mynocodebackend.ai.model.MultiFileCodeResult;
 import com.hefng.mynocodebackend.core.CodeFileSaver;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.request.ChatRequest;
-import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -57,7 +51,7 @@ class AiCodegenServiceTest {
 
     @Test
     void generateHtmlStream() {
-        Flux<String> codeStream = aiCodegenServiceFaced.generateAndSaveCodeWithStream("请帮我生成一个简单的个人博客首页, 不超过50行代码", CodegenTypeEnum.HTML, 1L);
+        Flux<String> codeStream = aiCodegenServiceFaced.generateAndSaveCodeWithStream("请帮我生成一个简单的个人博客首页, 不超过50行代码", CodegenTypeEnum.HTML, 667L);
         List<String> result = codeStream.collectList().block();
         Assertions.assertNotNull(result);
         String HtmlResult = String.join("", result);

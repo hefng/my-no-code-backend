@@ -81,7 +81,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (StringUtils.isNotBlank(codegenType)) {
             CodegenTypeEnum requestedType = CodegenTypeEnum.getByType(codegenType);
             ThrowUtils.throwIf(requestedType == null, ErrorCode.PARAMS_ERROR,
-                    "不支持的代码生成类型: " + codegenType + "，合法值为 html/multi_file/vue_project");
+                    "不支持的代码生成类型: " + codegenType + "，合法值为 html/multi-file/vue-project");
             // 仅在类型发生变化时才执行更新，避免无意义的 DB 写操作
             if (!codegenType.equals(app.getCodegenType())) {
                 App updateApp = new App();
@@ -136,21 +136,42 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         File srcFile = new File(srcPath);
         ThrowUtils.throwIf(!srcFile.exists(), ErrorCode.NOT_FOUND_ERROR, "源文件不存在，无法部署");
 
-        // 7. 将源文件目录下的文件复制到部署目录
+        // 7. Vue 工程化项目：部署 dist 目录（npm run build 的产物）
+        //    其他类型（html/multi_file）：直接部署源文件目录
+        if (AppConstant.VUE_PROJECT_CODEGEN_TYPE.equals(codegenType)) {
+            srcPath = srcPath + File.separator + "dist";
+            srcFile = new File(srcPath);
+            ThrowUtils.throwIf(!srcFile.exists(), ErrorCode.NOT_FOUND_ERROR,
+                    "Vue 项目尚未构建完成（dist 目录不存在），请稍后再试");
+        }
+
+        // 8. 将源文件目录下的文件复制到部署目录
         String deployPath = AppConstant.DEPLOY_DIR + File.separator + deployedKey;
         try {
-            FileUtil.copyContent(srcFile, new File(deployPath), true);
+            File deployDir = new File(deployPath);
+            if (AppConstant.VUE_PROJECT_CODEGEN_TYPE.equals(codegenType)) {
+                // vue-project 只复制 dist/index.html 和 dist/assets
+                File indexFile = new File(srcFile, "index.html");
+                ThrowUtils.throwIf(!indexFile.exists(), ErrorCode.NOT_FOUND_ERROR, "dist/index.html 不存在，请先构建项目");
+                FileUtil.copy(indexFile, new File(deployDir, "index.html"), true);
+                File assetsDir = new File(srcFile, "assets");
+                if (assetsDir.exists() && assetsDir.isDirectory()) {
+                    FileUtil.copyContent(assetsDir, new File(deployDir, "assets"), true);
+                }
+            } else {
+                FileUtil.copyContent(srcFile, deployDir, true);
+            }
         } catch (IORuntimeException e) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署失败，复制文件出错");
         }
 
-        // 8. 更新应用的 deployedKey 和 deployedTime
+        // 9. 更新应用的 deployedKey 和 deployedTime
         app.setDeployedKey(deployedKey);
         app.setDeployedTime(LocalDateTime.now());
         boolean success = updateById(app);
         ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "部署失败，更新应用信息失败");
 
-        // 9. 返回可访问的 URL 地址
+        // 10. 返回可访问的 URL 地址
         return AppConstant.CODE_DEPLOY_HOST + deployedKey;
     }
 
