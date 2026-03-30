@@ -17,25 +17,25 @@ import java.time.Duration;
 @Configuration
 public class ReasoningStreamingChatModelConfig {
 
-    @Value("${ai.reasoning-model.base-url}")
+    @Value("${langchain4j.open-ai.reasoning-model.base-url}")
     private String baseUrl;
 
-    @Value("${ai.reasoning-model.api-key}")
+    @Value("${langchain4j.open-ai.reasoning-model.api-key}")
     private String apiKey;
 
-    @Value("${ai.reasoning-model.model-name}")
+    @Value("${langchain4j.open-ai.reasoning-model.model-name}")
     private String modelName;
 
-    @Value("${ai.reasoning-model.max-tokens}")
+    @Value("${langchain4j.open-ai.reasoning-model.max-tokens}")
     private Integer maxTokens;
 
-    @Value("${ai.reasoning-model.return-thinking}")
+    @Value("${langchain4j.open-ai.reasoning-model.return-thinking}")
     private Boolean returnThinking;
 
-    @Value("${ai.reasoning-model.temperature}")
+    @Value("${langchain4j.open-ai.reasoning-model.temperature}")
     private Double temperature;
 
-    @Value("${ai.reasoning-model.timeout}")
+    @Value("${langchain4j.open-ai.reasoning-model.timeout}")
     private Long timeoutSeconds;
 
     /**

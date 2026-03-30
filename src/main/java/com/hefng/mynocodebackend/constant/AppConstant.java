@@ -15,11 +15,11 @@ public interface AppConstant {
      */
     int MAX_PRIORITY = 99;
 
-    String DEFAULT_DIR = System.getProperty("user.dir") + "\\tmp\\";
+    String DEFAULT_DIR = System.getProperty("user.dir") + "/tmp/";
 
-    String CODEGEN_DIR = DEFAULT_DIR + "codegen\\";
+    String CODEGEN_DIR = DEFAULT_DIR + "codegen/";
 
-    String DEPLOY_DIR = DEFAULT_DIR + "code_deploy\\";
+    String DEPLOY_DIR = DEFAULT_DIR + "code_deploy/";
 
     String CODE_DEPLOY_HOST = "http://localhost/";
 

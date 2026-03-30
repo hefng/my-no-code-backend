@@ -1,11 +1,14 @@
 package com.hefng.mynocodebackend.controller;
 
 import cn.hutool.json.JSONUtil;
+import com.hefng.mynocodebackend.ai.AiCodeGenTypeRoutingService;
+import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.annotation.AuthCheck;
 import com.hefng.mynocodebackend.common.BaseResponse;
 import com.hefng.mynocodebackend.common.DeleteRequest;
 import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.common.ResultUtils;
+import com.hefng.mynocodebackend.config.CosClientConfig;
 import com.hefng.mynocodebackend.constant.AppConstant;
 import com.hefng.mynocodebackend.constant.UserConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.util.List;
 
 import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
@@ -54,6 +58,12 @@ public class AppController {
     @Resource
     private ChatHistoryService chatHistoryService;
 
+    @Resource
+    private CosClientConfig cosClientConfig;
+
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+
     /**
      * 调用 AI 生成代码（流式 SSE）
      * <p>
@@ -65,14 +75,12 @@ public class AppController {
      *
      * @param appId       应用 id
      * @param userMessage 用户输入的消息
-     * @param codegenType 可选，生成代码类型（html/multi-file/vue-project）；传入时覆盖应用原有类型并持久化
      * @param request     HTTP 请求
      * @return SSE 事件流
      */
     @GetMapping(value = "chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                       @RequestParam String userMessage,
-                                                      @RequestParam String codegenType,
                                                       HttpServletRequest request) {
         // 校验参数
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
@@ -83,7 +91,7 @@ public class AppController {
         // 在调用服务生成代码之前，先保存用户的输入消息到对话历史中
         chatHistoryService.saveChatMessage(appId, loginUser.getId(), userMessage, ChatMessageTypeEnum.USER.getValue());
 
-        Flux<String> rawFlux = appService.chatToGenCode(appId, userMessage, codegenType, loginUser);
+        Flux<String> rawFlux = appService.chatToGenCode(appId, userMessage, loginUser);
 
         // 用于收集完整 AI 回答（思考过程 + 最终答案），流结束后一并保存到对话历史
         StringBuilder aiResponseBuilder = new StringBuilder();
@@ -187,15 +195,23 @@ public class AppController {
         }
         
         User loginUser = userService.getLoginUser(request);
-        
+
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
         app.setAppOwnerId(loginUser.getId());
-        app.setAppName(initPrompt.substring(0, 4)); // 暂时使用初始化提示的前12个字符作为应用名称
+        app.setAppName(initPrompt.substring(0, 4)); // 暂时使用初始化提示的前4个字符作为应用名称
         app.setPriority(AppConstant.DEFAULT_PRIORITY);
-        String codegenType = app.getCodegenType();
+        // 构建默认的应用封面url
+        String defaultCoverUrl = cosClientConfig.getHost() + "/covers/public/default_covers.png";
+        app.setAppCover(defaultCoverUrl);
+        // 调用 AI 代码生成类型路由服务，根据用户输入的初始化提示智能推荐代码生成类型
+        CodegenTypeEnum codegenTypeEnum = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        String codegenType = codegenTypeEnum != null ? codegenTypeEnum.getType() : null;
+        // 降级策略：如果 AI 推荐失败，则默认生成 HTML 代码
         if (codegenType == null) {
-            app.setCodegenType(AppConstant.DEFAULT_CODEGEN_TYPE); // 默认生成 HTML 代码
+            app.setCodegenType(AppConstant.DEFAULT_CODEGEN_TYPE);
+        } else {
+            app.setCodegenType(codegenType);
         }
 
         boolean result = false;
@@ -203,7 +219,7 @@ public class AppController {
             result = appService.save(app);
         } catch (Exception e) {
             log.error("保存应用失败", e);
-            throw new RuntimeException(e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存应用失败: " + e.getMessage());
         }
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         

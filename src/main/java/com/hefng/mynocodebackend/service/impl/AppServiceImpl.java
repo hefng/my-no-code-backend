@@ -8,10 +8,10 @@ import cn.hutool.core.util.StrUtil;
 import com.hefng.mynocodebackend.ai.AiCodegenServiceFaced;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.common.ErrorCode;
-import com.hefng.mynocodebackend.constant.AppConstant;
-import com.hefng.mynocodebackend.constant.CommonConstant;
+import com.hefng.mynocodebackend.constant.AppConstant;import com.hefng.mynocodebackend.constant.CommonConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.exception.ThrowUtils;
+import com.hefng.mynocodebackend.manager.CosManager;
 import com.hefng.mynocodebackend.mapper.AppMapper;
 import com.hefng.mynocodebackend.model.dto.app.AppQueryRequest;
 import com.hefng.mynocodebackend.model.entity.App;
@@ -59,8 +59,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private ChatHistoryService chatHistoryService;
 
+    @Resource
+    private CosManager cosManager;
+
     @Override
-    public Flux<String> chatToGenCode(Long appId, String userMessage, String codegenType, User loginUser) {
+    public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
         ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
@@ -76,23 +79,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             userMessage = initPrompt;
         }
 
-        // 4. 若前端传入了 codegenType，校验合法性后覆盖应用原有类型并持久化
-        // 这样下次进入应用时预览 URL 和生成逻辑都能保持一致，不会出现类型漂移
-        if (StringUtils.isNotBlank(codegenType)) {
-            CodegenTypeEnum requestedType = CodegenTypeEnum.getByType(codegenType);
-            ThrowUtils.throwIf(requestedType == null, ErrorCode.PARAMS_ERROR,
-                    "不支持的代码生成类型: " + codegenType + "，合法值为 html/multi-file/vue-project");
-            // 仅在类型发生变化时才执行更新，避免无意义的 DB 写操作
-            if (!codegenType.equals(app.getCodegenType())) {
-                App updateApp = new App();
-                updateApp.setId(appId);
-                updateApp.setCodegenType(codegenType);
-                updateById(updateApp);
-                app.setCodegenType(codegenType);
-            }
-        }
-
-        // 5. 根据最终确定的 codegenType 路由到对应的生成策略
+        // 4. 根据应用已有的 codegenType 路由到对应的生成策略
         String finalCodegenType = app.getCodegenType();
         CodegenTypeEnum codegenTypeEnum = CodegenTypeEnum.getByType(finalCodegenType);
         if (codegenTypeEnum == null) {
@@ -172,7 +159,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "部署失败，更新应用信息失败");
 
         // 10. 返回可访问的 URL 地址
-        return AppConstant.CODE_DEPLOY_HOST + deployedKey;
+        String deployUrl = AppConstant.CODE_DEPLOY_HOST + deployedKey;
+
+        // 11. 异步截图任务（虚拟线程），不阻塞部署接口响应
+        final String finalDeployedKey = deployedKey;
+        final Long finalAppId = appId;
+        Thread.ofVirtual().name("screenshot-" + appId).start(() -> {
+            try {
+                asyncScreenshotAndUpdateCover(finalAppId, deployUrl, loginUser.getId());
+            } catch (Exception e) {
+                log.error("[Screenshot] 封面截图失败, appId={}", finalAppId, e);
+            }
+        });
+
+        return deployUrl;
     }
 
 
@@ -263,5 +263,32 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         chatHistoryService.removeByAppId(appId);
         // 再删除应用本身
         return this.removeById(appId);
+    }
+
+    /**
+     * 截图并上传封面，更新应用 appCover 字段
+     *
+     * @param appId   应用id
+     * @param pageUrl 要截图的部署页面地址
+     * @param userId  当前用户id，用于构建 COS 存储路径
+     */
+    private void asyncScreenshotAndUpdateCover(Long appId, String pageUrl, Long userId) {
+        String coverName = appId + ".webp";
+        String screenshotPath = AppConstant.DEFAULT_DIR + "screenshots" + File.separator + "pic" + File.separator + coverName;
+        String cosKey = "covers/" + userId + "/" + coverName;
+        String coverUrl = cosManager.screenshotAndUpload(pageUrl, screenshotPath, cosKey);
+        // 上传到 cos 之后, 清理本地文件
+        if (!FileUtil.exist(screenshotPath)) {
+            log.warn("[Screenshot] 本地截图文件不存在, appId={}, path={}", appId, screenshotPath);
+            return;
+        }
+        FileUtil.del(screenshotPath);
+
+        App coverUpdate = new App();
+        coverUpdate.setId(appId);
+        coverUpdate.setAppCover(coverUrl);
+        updateById(coverUpdate);
+
+        log.info("[Screenshot] 封面截图完成, appId={}, coverUrl={}", appId, coverUrl);
     }
 }

@@ -5,6 +5,7 @@ import com.hefng.mynocodebackend.ai.model.HTMLCodeResult;
 import com.hefng.mynocodebackend.ai.model.MultiFileCodeResult;
 import com.hefng.mynocodebackend.core.CodeFileSaver;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +14,7 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 
 @SpringBootTest
+@Slf4j
 class AiCodegenServiceTest {
 
     @Resource
@@ -26,8 +28,9 @@ class AiCodegenServiceTest {
 
     @Test
     void generateHTML() {
-        HTMLCodeResult htmlCodeResult = aiCodegenService.generateHtml("请帮我生成一个简单的个人博客首页, 不超过50行代码", 1L);
-        System.out.println(htmlCodeResult);
+        HTMLCodeResult htmlCodeResult = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(89L).generateHtml("做个程序员鱼皮的工具网站，总代码量不超过 20 行", 89L);
+        Assertions.assertNotNull(htmlCodeResult);
+        System.out.println(htmlCodeResult.getHtmlCode());
     }
 
     @Test

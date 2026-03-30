@@ -43,23 +43,46 @@ knife4j:
   setting:
     language: zh_cn
 # AI
-#langchain4j:
-#  open-ai:
-#    chat-model:
-#      base-url: https://open.bigmodel.cn/api/paas/v4
-#      api-key: "<Your API Key>"
-#      model-name: glm-4.6
-#      log-requests: true
-#      log-responses: true
-#      max-tokens: 16384
-#    streaming-chat-model:
-#      base-url: https://open.bigmodel.cn/api/paas/v4
-#      api-key: "<Your API Key>"
-#      model-name: glm-4.7-flash
-#      log-requests: true
-#      log-responses: true
-#      max-tokens: 16384
-#  memory:
-#    max-messages: 20
-#    redis-key-prefix: "lc4j:chat_memory:"
-#    ttl-seconds: 604800 # 7天
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      api-key: "<your-api-key>"
+      model-name: glm-4.6
+      log-requests: true
+      log-responses: true
+      max-tokens: 16384
+    streaming-chat-model:
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      api-key: "<your-api-key>"
+      model-name: glm-4.7
+      log-requests: true
+      log-responses: true
+      max-tokens: 65536
+    reasoning-model:
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      api-key: "<your-api-key>"
+      model-name: glm-4.7
+      max-tokens: 65536
+      return-thinking: true
+      temperature: 0.1
+      timeout: 300000 # 300秒
+  memory:
+    max-messages: 20
+    redis-key-prefix: "lc4j:chat_memory:"
+    ttl-seconds: 604800 # 7天
+#cos:
+  client:
+    host: "<your cos host>"
+    secretId: "<your secret id>"
+    secretKey: "<your secret key>"
+    region: "<your region>"
+    bucket: "<your bucket>"
+# Selenium WebDriver 池配置
+webdriver:
+  pool:
+    max-size: 3          # 最大 driver 数量，默认 3
+    borrow-timeout-seconds: 30  # 借用超时秒数，默认 30
+  window:
+    width: 1920
+    height: 1080

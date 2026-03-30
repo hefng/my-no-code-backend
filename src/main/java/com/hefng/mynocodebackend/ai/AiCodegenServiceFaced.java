@@ -39,9 +39,6 @@ import java.util.Map;
 public class AiCodegenServiceFaced {
 
     @Resource
-    private AiCodegenService aiCodegenService;
-
-    @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
     @Resource
@@ -57,13 +54,14 @@ public class AiCodegenServiceFaced {
         if (codegenTypeEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "代码生成类型不能为空");
         }
+        AiCodegenService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
         return switch (codegenTypeEnum) {
             case HTML -> {
-                HTMLCodeResult htmlCodeResult = aiCodegenService.generateHtml(userMessage, 1L);
+                HTMLCodeResult htmlCodeResult = aiCodeGeneratorService.generateHtml(userMessage, 1L);
                 yield CodeFileSaverExecutor.saveCodeFile(htmlCodeResult, CodegenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
-                MultiFileCodeResult multiFileCodeResult = aiCodegenService.generateMultiFileCode(userMessage);
+                MultiFileCodeResult multiFileCodeResult = aiCodeGeneratorService.generateMultiFileCode(userMessage);
                 yield CodeFileSaverExecutor.saveCodeFile(multiFileCodeResult, CodegenTypeEnum.MULTI_FILE, appId);
             }
             case VUE_PROJECT -> throw new BusinessException(ErrorCode.PARAMS_ERROR, "Vue工程化项目仅支持流式生成");
