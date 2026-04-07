@@ -1,4 +1,4 @@
-package com.hefng.mynocodebackend.ai;
+package com.hefng.mynocodebackend.ai.service;
 
 import com.hefng.mynocodebackend.ai.model.HTMLCodeResult;
 import com.hefng.mynocodebackend.ai.model.MultiFileCodeResult;
@@ -12,7 +12,7 @@ import dev.langchain4j.service.UserMessage;
  *
  * @author hefng
  */
-interface AiCodegenService {
+public interface AiCodegenService {
 
     /**
      * 根据用户输入生成 HTML 代码

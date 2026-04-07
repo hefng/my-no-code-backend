@@ -1,6 +1,8 @@
 package com.hefng.mynocodebackend.ai.tool;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolMemoryId;
@@ -38,7 +40,7 @@ public class ProjectDirectoryReadTool extends BaseProjectTool {
             @ToolMemoryId Long appId) {
 
         String projectDir = buildProjectDir(appId);
-
+        log.info("开始读取目录，appId={}, relativePath={}, projectDir={}", appId, relativePath, projectDir);
         // 确定要读取的目标目录
         File targetDir;
         if (relativePath == null || relativePath.isBlank() || ".".equals(relativePath.trim())) {
@@ -85,5 +87,24 @@ public class ProjectDirectoryReadTool extends BaseProjectTool {
             log.error("目录读取失败，appId={}, error={}", appId, e.getMessage(), e);
             return "失败：读取目录时发生错误 - " + e.getMessage();
         }
+    }
+
+    @Override
+    protected String getToolName() {
+        return "directoryReadTool";
+    }
+
+    @Override
+    protected String getToolDescription() {
+        return "目录读取";
+    }
+
+    @Override
+    public String generateToolExecutedResult(JSONObject arguments) {
+        String relativeDirPath = arguments.getStr("relativeDirPath");
+        if (StrUtil.isEmpty(relativeDirPath)) {
+            relativeDirPath = "根目录";
+        }
+        return String.format("[工具调用] %s %s", getToolDescription(), relativeDirPath);
     }
 }

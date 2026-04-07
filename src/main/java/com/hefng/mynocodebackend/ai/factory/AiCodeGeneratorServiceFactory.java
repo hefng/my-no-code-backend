@@ -1,5 +1,6 @@
-package com.hefng.mynocodebackend.ai;
+package com.hefng.mynocodebackend.ai.factory;
 
+import com.hefng.mynocodebackend.ai.service.AiCodegenService;
 import com.hefng.mynocodebackend.service.ChatHistoryService;
 import dev.langchain4j.community.store.ememory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;

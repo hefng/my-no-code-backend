@@ -2,6 +2,7 @@ package com.hefng.mynocodebackend.ai.tool;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.ToolMemoryId;
@@ -24,7 +25,7 @@ import java.nio.file.Path;
  */
 @Slf4j
 @Component
-public class VueProjectFileSaveTool extends BaseProjectTool {
+public class ProjectFileSaveTool extends BaseProjectTool {
 
     /**
      * 将单个文件内容写入 Vue 项目目录
@@ -57,19 +58,36 @@ public class VueProjectFileSaveTool extends BaseProjectTool {
             // 确保父目录存在（如 src/components/ 不存在时自动创建）
             FileUtil.mkParentDirs(resolvedPath.toFile());
             FileUtil.writeString(content, resolvedPath.toFile(), StandardCharsets.UTF_8);
-            // 文件扩展名
-            String suffix = FileUtil.getSuffix(relativePath);
+
             log.info("Vue项目文件写入成功，appId={}, path={}", appId, resolvedPath);
-            return String.format("""
-                    [文件保存] %s
-                    ```%s
-                    %s
-                    ```
-                    """, resolvedPath, suffix, content);
+            return "文件保存成功: " + relativePath;
         } catch (Exception e) {
             log.error("Vue项目文件写入失败，appId={}, path={}, error={}", appId, relativePath, e.getMessage(), e);
             return "失败：写入文件时发生错误 - " + e.getMessage();
         }
     }
 
+    @Override
+    protected String getToolName() {
+        return "fileSaveTool";
+    }
+
+    @Override
+    protected String getToolDescription() {
+        return "文件保存";
+    }
+
+    @Override
+    public String generateToolExecutedResult(JSONObject arguments) {
+        String resolvedPath = arguments.getStr("resolvedPath");
+        String content = arguments.getStr("content");
+        // 文件扩展名
+        String suffix = FileUtil.getSuffix(resolvedPath);
+        return String.format("""
+                    [文件保存] %s
+                    ```%s
+                    %s
+                    ```
+                    """, resolvedPath, suffix, content);
+    }
 }

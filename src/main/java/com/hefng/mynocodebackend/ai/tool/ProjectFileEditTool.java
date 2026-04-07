@@ -2,6 +2,7 @@ package com.hefng.mynocodebackend.ai.tool;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolMemoryId;
@@ -14,7 +15,7 @@ import java.nio.file.Path;
 /**
  * Vue 项目文件编辑工具
  * <p>
- * 与 {@link VueProjectFileSaveTool} 的区别：
+ * 与 {@link ProjectFileSaveTool} 的区别：
  * 本工具支持对文件中的指定代码片段进行精准替换，无需重写整个文件，
  * 适用于 AI 对已有文件进行局部修改的场景，大幅减少 token 消耗。
  *
@@ -72,10 +73,38 @@ public class ProjectFileEditTool extends BaseProjectTool {
             FileUtil.writeString(updatedContent, resolvedPath.toFile(), StandardCharsets.UTF_8);
 
             log.info("文件编辑成功，appId={}, path={}", appId, resolvedPath);
-            return "成功：文件已更新 - " + relativePath;
+            return "文件修改成功" + relativePath;
         } catch (Exception e) {
             log.error("文件编辑失败，appId={}, path={}, error={}", appId, relativePath, e.getMessage(), e);
             return "失败：编辑文件时发生错误 - " + e.getMessage();
         }
+    }
+
+    @Override
+    protected String getToolName() {
+        return "fileEditTool";
+    }
+
+    @Override
+    protected String getToolDescription() {
+        return "文件编辑";
+    }
+
+    @Override
+    public String generateToolExecutedResult(JSONObject arguments) {
+        String relativePath = arguments.getStr("relativePath");
+        String oldContent = arguments.getStr("oldContent");
+        String newContent = arguments.getStr("newContent");
+        return String.format("""
+                    [文件编辑] %s
+                    编辑前:
+                    ```%s
+                    %s
+                    ```
+                    编辑后:
+                    ```%s
+                    %s
+                    ```
+                    """, relativePath, FileUtil.getSuffix(relativePath), oldContent, FileUtil.getSuffix(relativePath), newContent);
     }
 }

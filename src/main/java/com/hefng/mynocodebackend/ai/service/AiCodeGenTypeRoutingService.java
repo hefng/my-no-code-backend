@@ -1,4 +1,4 @@
-package com.hefng.mynocodebackend.ai;
+package com.hefng.mynocodebackend.ai.service;
 
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import dev.langchain4j.service.SystemMessage;

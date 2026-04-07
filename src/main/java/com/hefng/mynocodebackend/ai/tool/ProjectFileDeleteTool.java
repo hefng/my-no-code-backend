@@ -2,6 +2,7 @@ package com.hefng.mynocodebackend.ai.tool;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolMemoryId;
@@ -56,10 +57,26 @@ public class ProjectFileDeleteTool extends BaseProjectTool {
         try {
             FileUtil.del(resolvedPath.toFile());
             log.info("文件删除成功，appId={}, path={}", appId, resolvedPath);
-            return "成功：文件已删除 - " + relativePath;
+            return "文件删除成功: " + relativePath;
         } catch (Exception e) {
             log.error("文件删除失败，appId={}, path={}, error={}", appId, relativePath, e.getMessage(), e);
             return "失败：删除文件时发生错误 - " + e.getMessage();
         }
+    }
+
+    @Override
+    protected String getToolName() {
+        return "fileDeleteTool";
+    }
+
+    @Override
+    protected String getToolDescription() {
+        return "文件删除";
+    }
+
+    @Override
+    public String generateToolExecutedResult(JSONObject arguments) {
+        String relativePath = arguments.getStr("relativePath");
+        return String.format("[文件删除] %s", relativePath);
     }
 }

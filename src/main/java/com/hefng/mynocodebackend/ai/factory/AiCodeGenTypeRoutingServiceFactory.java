@@ -1,5 +1,6 @@
-package com.hefng.mynocodebackend.ai;
+package com.hefng.mynocodebackend.ai.factory;
 
+import com.hefng.mynocodebackend.ai.service.AiCodeGenTypeRoutingService;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;

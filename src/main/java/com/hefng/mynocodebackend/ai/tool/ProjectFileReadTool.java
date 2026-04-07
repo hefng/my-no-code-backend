@@ -2,6 +2,7 @@ package com.hefng.mynocodebackend.ai.tool;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolMemoryId;
@@ -9,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -56,13 +58,28 @@ public class ProjectFileReadTool extends BaseProjectTool {
         try {
             String content = FileUtil.readString(resolvedPath.toFile(), StandardCharsets.UTF_8);
             log.info("文件读取成功，appId={}, path={}", appId, resolvedPath);
-
-            // 返回带路径标注的文件内容，方便 AI 理解上下文
-            String suffix = FileUtil.getSuffix(relativePath);
-            return String.format("文件路径：%s\n```%s\n%s\n```", relativePath, suffix, content);
+            return content;
         } catch (Exception e) {
             log.error("文件读取失败，appId={}, path={}, error={}", appId, relativePath, e.getMessage(), e);
             return "失败：读取文件时发生错误 - " + e.getMessage();
         }
+    }
+
+    @Override
+    protected String getToolName() {
+        return "fileReadTool";
+    }
+
+    @Override
+    protected String getToolDescription() {
+        return "文件读取";
+    }
+
+    @Override
+    public String generateToolExecutedResult(JSONObject arguments) {
+        String relativePath = arguments.getStr("relativePath");
+        String suffix = FileUtil.getSuffix(relativePath);
+        String content = arguments.getStr("content");
+        return String.format("[文件读取] %s\n```%s\n%s\n```", relativePath, suffix, content);
     }
 }
