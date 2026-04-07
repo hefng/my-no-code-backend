@@ -1,6 +1,7 @@
 package com.hefng.mynocodebackend.ai;
 
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
+import com.hefng.mynocodebackend.ai.service.AiCodeGenTypeRoutingService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
