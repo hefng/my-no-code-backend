@@ -30,7 +30,7 @@ class AiCodegenServiceTest {
 
     @Test
     void generateHTML() {
-        HTMLCodeResult htmlCodeResult = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(89L).generateHtml("做个程序员鱼皮的工具网站，总代码量不超过 20 行", 89L);
+        HTMLCodeResult htmlCodeResult = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(21L).generateHtml("做个程序员鱼皮的工具网站，总代码量不超过 20 行", 21L);
         Assertions.assertNotNull(htmlCodeResult);
         System.out.println(htmlCodeResult.getHtmlCode());
     }

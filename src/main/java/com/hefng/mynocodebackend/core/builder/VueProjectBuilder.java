@@ -1,7 +1,9 @@
 package com.hefng.mynocodebackend.core.builder;
 
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
+import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.constant.AppConstant;
+import com.hefng.mynocodebackend.exception.ThrowUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -41,7 +43,8 @@ public class VueProjectBuilder {
                 .name("vue-build-" + appId)
                 .start(() -> {
                     try {
-                        doBuild(appId);
+                        boolean success = doBuild(appId);
+                        ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "构建失败");
                         future.complete(null);
                     } catch (Exception e) {
                         log.error("[VueBuilder] 构建失败, appId={}", appId, e);
@@ -58,13 +61,13 @@ public class VueProjectBuilder {
      * @param appId 应用 id
      * @throws Exception 任意步骤失败时抛出
      */
-    private void doBuild(Long appId) throws Exception {
+    public boolean doBuild(Long appId) throws Exception {
         String projectDir = buildProjectDir(appId);
 
         // 校验项目目录是否存在
         File dir = new File(projectDir);
         if (!dir.exists() || !dir.isDirectory()) {
-            throw new IllegalStateException("Vue 项目目录不存在: " + projectDir);
+            return false;
         }
 
         log.info("[VueBuilder] 开始构建 Vue 项目, appId={}, dir={}", appId, projectDir);
@@ -76,6 +79,7 @@ public class VueProjectBuilder {
         runCommand(projectDir, "npm run build");
 
         log.info("[VueBuilder] Vue 项目构建完成, appId={}, distDir={}/dist", appId, projectDir);
+        return true;
     }
 
     /**

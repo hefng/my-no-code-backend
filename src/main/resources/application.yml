@@ -86,3 +86,8 @@ webdriver:
   window:
     width: 1920
     height: 1080
+pexels:
+  api-key: <Your Pexels API Key>
+dashscope:
+  api-key: <Your API Key>
+  model-name: "wanx2.0-t2i-turbo"
