@@ -2,6 +2,7 @@ package com.hefng.mynocodebackend.langgraph4j.state;
 
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.langgraph4j.entity.ImageResource;
+import com.hefng.mynocodebackend.langgraph4j.entity.QualityResult;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 工作流上下文 - 存储所有状态信息
+ * 工作流上下文 - 存储流程中的状态信息
  */
 @Data
 @Builder
@@ -23,7 +24,7 @@ import java.util.Map;
 public class WorkflowContext implements Serializable {
 
     /**
-     * WorkflowContext 在 MessagesState 中的存储key
+     * WorkflowContext 在 MessagesState 中的存储 key
      */
     public static final String WORKFLOW_CONTEXT_KEY = "workflowContext";
 
@@ -63,7 +64,7 @@ public class WorkflowContext implements Serializable {
     private String generatedCodeDir;
 
     /**
-     * 构建成功的目录
+     * 构建成功目录
      */
     private String buildResultDir;
 
@@ -77,22 +78,65 @@ public class WorkflowContext implements Serializable {
      */
     private Long appId;
 
+    /**
+     * 代码质量检查结果
+     */
+    private QualityResult qualityResult;
+
+    /**
+     * 代码质量检查重试次数（失败后递增）
+     */
+    @Builder.Default
+    private Integer codeQualityRetryCount = 0;
+
+    /**
+     * 代码质量检查最大重试次数（默认 2，可按上下文覆盖）
+     */
+    @Builder.Default
+    private Integer codeQualityMaxRetries = 2;
+
+    /**
+     * 是否达到代码质量检查重试上限
+     */
+    @Builder.Default
+    private Boolean codeQualityRetryExhausted = false;
+
     @Serial
     private static final long serialVersionUID = 1L;
-
-    // ========== 上下文操作方法 ==========
 
     /**
      * 从 MessagesState 中获取 WorkflowContext
      */
     public static WorkflowContext getContext(MessagesState<String> state) {
-        return (WorkflowContext) state.data().get(WORKFLOW_CONTEXT_KEY);
+        WorkflowContext context = (WorkflowContext) state.data().get(WORKFLOW_CONTEXT_KEY);
+        if (context != null) {
+            context.initCodeQualityRetryConfigIfAbsent();
+        }
+        return context;
     }
 
     /**
      * 将 WorkflowContext 保存到 MessagesState 中
      */
     public static Map<String, Object> saveContext(WorkflowContext context) {
+        if (context != null) {
+            context.initCodeQualityRetryConfigIfAbsent();
+        }
         return Map.of(WORKFLOW_CONTEXT_KEY, context);
+    }
+
+    /**
+     * 兜底初始化，兼容旧上下文未携带新字段
+     */
+    public void initCodeQualityRetryConfigIfAbsent() {
+        if (codeQualityRetryCount == null || codeQualityRetryCount < 0) {
+            codeQualityRetryCount = 0;
+        }
+        if (codeQualityMaxRetries == null || codeQualityMaxRetries <= 0) {
+            codeQualityMaxRetries = 2;
+        }
+        if (codeQualityRetryExhausted == null) {
+            codeQualityRetryExhausted = false;
+        }
     }
 }

@@ -1,16 +1,11 @@
 package com.hefng.mynocodebackend.langgraph4j.node;
 
-import com.hefng.mynocodebackend.langgraph4j.entity.ImageResource;
-import com.hefng.mynocodebackend.langgraph4j.entity.enums.ImageCategoryEnum;
 import com.hefng.mynocodebackend.langgraph4j.service.AiImageCollectService;
 import com.hefng.mynocodebackend.langgraph4j.state.WorkflowContext;
 import com.hefng.mynocodebackend.utils.SpringContextUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.action.AsyncNodeAction;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
-
-import java.util.Arrays;
-import java.util.List;
 
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
