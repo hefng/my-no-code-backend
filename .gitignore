@@ -4,6 +4,8 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+.codex
+.kiro
 
 ### STS ###
 .apt_generated
@@ -34,4 +36,3 @@ build/
 
 ### VS Code ###
 .vscode/
-src/main/resources/application-local.yml

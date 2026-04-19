@@ -1,11 +1,14 @@
 package com.hefng.mynocodebackend.langgraph4j;
 
+import cn.hutool.core.date.StopWatch;
 import com.hefng.mynocodebackend.langgraph4j.service.AiImageCollectService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
 @Slf4j
@@ -16,9 +19,13 @@ class AiImageCollectServiceTest {
 
     @Test
     void testTechWebsiteImageCollection() {
+        StopWatch stopWatch = StopWatch.create("技术网站图片收集测试");
+        stopWatch.start();
         String result = imageCollectionService.collectImages("创建一个技术博客网站，需要展示编程教程和系统架构");
+        stopWatch.stop();
+        String time = stopWatch.prettyPrint(TimeUnit.SECONDS);
+        log.info("技术网站图片收集完成，耗时: {}", time);
         Assertions.assertNotNull(result);
-        System.out.println("技术网站收集到的图片: " + result);
     }
 
     @Test
