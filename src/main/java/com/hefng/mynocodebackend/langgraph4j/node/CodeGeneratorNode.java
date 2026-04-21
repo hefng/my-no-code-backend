@@ -3,6 +3,7 @@ package com.hefng.mynocodebackend.langgraph4j.node;
 import com.hefng.mynocodebackend.ai.AiCodegenServiceFaced;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.constant.AppConstant;
+import com.hefng.mynocodebackend.langgraph4j.enums.WorkflowOperationTypeEnum;
 import com.hefng.mynocodebackend.langgraph4j.entity.QualityResult;
 import com.hefng.mynocodebackend.langgraph4j.state.WorkflowContext;
 import com.hefng.mynocodebackend.utils.SpringContextUtil;
@@ -30,8 +31,7 @@ public class CodeGeneratorNode {
 
             AiCodegenServiceFaced codeGeneratorFacade = SpringContextUtil.getBean(AiCodegenServiceFaced.class);
 
-            // 先使用固定 appId，后续可替换为真实业务 appId
-            Long appId = 0L;
+            Long appId = context.getAppId();
             Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeWithStream(userMessage, generationType, appId);
             codeStream.blockLast(Duration.ofMinutes(10));
 
@@ -60,7 +60,23 @@ public class CodeGeneratorNode {
                     qualityResult.getErrors(), qualityResult.getSuggestions());
             return buildFailedMessage(qualityResult);
         }
+        if (context.getOperationType() == WorkflowOperationTypeEnum.MODIFY) {
+            return buildModifyMessage(context);
+        }
+        if (enhancedPrompt == null || enhancedPrompt.isBlank()) {
+            return context.getOriginalPrompt();
+        }
         return enhancedPrompt;
+    }
+
+    private static String buildModifyMessage(WorkflowContext context) {
+        String originalPrompt = context.getOriginalPrompt() == null ? "" : context.getOriginalPrompt();
+        return "## 修改模式（已创建应用）\n"
+                + "你现在处理的是对现有应用的局部改动请求。\n"
+                + "请仅围绕用户当前指令进行最小必要修改，保持未提及部分不变。\n"
+                + "不要重建整站结构，不要替换无关内容。\n\n"
+                + "### 用户指令\n"
+                + originalPrompt;
     }
 
     /**

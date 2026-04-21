@@ -25,7 +25,7 @@ public interface AppService extends IService<App> {
      * @param loginUser   当前登录用户
      * @return AI 生成的代码流
      */
-    Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser);
+    Flux<String> chatToGenCode(Long appId, String userMessage, Boolean isAgent, User loginUser);
 
     /**
      * 部署应用

@@ -1,18 +1,14 @@
 package com.hefng.mynocodebackend.langgraph4j;
 
+import cn.hutool.json.JSONUtil;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.langgraph4j.enums.WorkflowOperationTypeEnum;
 import com.hefng.mynocodebackend.langgraph4j.entity.QualityResult;
-import com.hefng.mynocodebackend.langgraph4j.node.CodeGeneratorNode;
-import com.hefng.mynocodebackend.langgraph4j.node.CodeQualityCheckerNode;
-import com.hefng.mynocodebackend.langgraph4j.node.ImageCollectorNode;
-import com.hefng.mynocodebackend.langgraph4j.node.OperationRouterNode;
-import com.hefng.mynocodebackend.langgraph4j.node.ProjectBuilderNode;
-import com.hefng.mynocodebackend.langgraph4j.node.PromptEnhancerNode;
-import com.hefng.mynocodebackend.langgraph4j.node.SmartRouterNode;
+import com.hefng.mynocodebackend.langgraph4j.node.*;
 import com.hefng.mynocodebackend.langgraph4j.state.WorkflowContext;
+import com.hefng.mynocodebackend.model.enums.SseEventTypeEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphRepresentation;
@@ -21,7 +17,10 @@ import org.bsc.langgraph4j.NodeOutput;
 import org.bsc.langgraph4j.action.AsyncEdgeAction;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
 import org.bsc.langgraph4j.prebuilt.MessagesStateGraph;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -29,7 +28,17 @@ import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
 
 @Slf4j
-public class CodeGenWorkflow {
+public class CodeGenWorkflowWithFlux {
+
+    private static final String ERROR_EVENT = "workflow_error";
+    private static final Map<String, String> WORKFLOW_STEP_TITLES = Map.of(
+            "image_collector", "收集图片",
+            "prompt_enhancer", "增强提示词",
+            "router", "分析生成策略",
+            "code_generator", "生成代码",
+            "code_quality_checker", "检查代码质量",
+            "project_builder", "构建项目"
+    );
 
     static final String BUILD_ROUTE = "need_build";
     static final String SKIP_ROUTE = "skip_build";
@@ -119,33 +128,79 @@ public class CodeGenWorkflow {
     }
 
     /**
-     * 执行工作流
+     * 执行工作流（流式）
      */
-    public WorkflowContext executeWorkflow(String originalPrompt) {
-        CompiledGraph<MessagesState<String>> workflow = createWorkflow();
-        WorkflowContext initialContext = WorkflowContext.builder()
-                .originalPrompt(originalPrompt)
-                .currentStep("init")
-                .build();
+    public Flux<String> executeWorkflowWithFlux(String originalPrompt,
+                                                Long appId,
+                                                WorkflowOperationTypeEnum operationType,
+                                                CodegenTypeEnum generationType) {
+        return Flux.<String>create(sink -> {
+                    CompiledGraph<MessagesState<String>> workflow = createWorkflow();
+                    WorkflowContext initialContext = WorkflowContext.builder()
+                            .appId(appId)
+                            .originalPrompt(originalPrompt)
+                            .operationType(operationType)
+                            .generationType(generationType)
+                            .currentStep("init")
+                            .build();
 
-        GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
-        log.info("工作流图:\n{}", graph.content());
-        log.info("开始执行代码生成工作流");
+                    GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
+                    log.info("工作流图:\n{}", graph.content());
+                    log.info("开始执行代码生成工作流");
 
-        WorkflowContext finalContext = null;
-        int stepCounter = 1;
-        for (NodeOutput<MessagesState<String>> step : workflow.stream(
-                Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext))) {
-            log.info("--- 第 {} 步完成 ---", stepCounter);
-            WorkflowContext currentContext = WorkflowContext.getContext(step.state());
-            if (currentContext != null) {
-                finalContext = currentContext;
-                log.info("当前上下文: {}", currentContext);
-            }
-            stepCounter++;
+                    try {
+                        int nodeCounter = 1;
+                        int workflowStepCounter = 1;
+                        for (NodeOutput<MessagesState<String>> step : workflow.stream(
+                                Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext))) {
+                            if (sink.isCancelled()) {
+                                log.info("工作流流式输出已取消");
+                                return;
+                            }
+                            WorkflowContext currentContext = WorkflowContext.getContext(step.state());
+                            log.info("--- 节点 {} 完成，节点：{} ---", nodeCounter, step.node());
+                            if (currentContext != null) {
+                                log.info("当前上下文: {}", currentContext);
+                            }
+                            String stepOutput = buildStepOutput(workflowStepCounter, step);
+                            if (stepOutput != null) {
+                                sink.next(stepOutput);
+                                workflowStepCounter++;
+                            }
+                            nodeCounter++;
+                        }
+                        log.info("代码生成工作流执行完成");
+                        sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
+                        sink.complete();
+                    } catch (Exception e) {
+                        log.error("代码生成工作流执行失败", e);
+                        String errorMessage = e.getMessage() == null ? "工作流执行失败" : e.getMessage();
+                        sink.next(buildEventOutput(ERROR_EVENT, errorMessage));
+                        sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
+                        sink.complete();
+                    }
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private String buildStepOutput(int stepCounter,
+                                   NodeOutput<MessagesState<String>> step) {
+        String title = WORKFLOW_STEP_TITLES.get(step.node());
+        if (title == null) {
+            return null;
         }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("step", stepCounter);
+        payload.put("node", step.node());
+        payload.put("title", title);
+        payload.put("status", "completed");
+        return buildEventOutput(SseEventTypeEnum.WORKFLOW_STEP.getValue(), payload);
+    }
 
-        log.info("代码生成工作流执行完成");
-        return finalContext;
+    private String buildEventOutput(String event, Object data) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("event", event);
+        payload.put("d", data);
+        return JSONUtil.toJsonStr(payload);
     }
 }

@@ -185,8 +185,8 @@ public class AiCodegenServiceFaced {
                 })
                 .onCompleteResponse(response -> {
                     try {
-                        String code = answerBuilder.toString();
-                        Object parseResult = CodeParserExecutor.parseCode(code, codegenTypeEnum);
+                        String answer = answerBuilder.toString();
+                        Object parseResult = CodeParserExecutor.parseCode(answer, codegenTypeEnum);
                         CodeFileSaverExecutor.saveCodeFile(parseResult, codegenTypeEnum, appId);
                     } catch (Exception e) {
                         log.error("[{}] 代码解析/保存失败, appId={}", codegenTypeEnum, appId, e);

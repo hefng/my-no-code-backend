@@ -19,6 +19,11 @@ public class SmartRouterNode {
     public static AsyncNodeAction<MessagesState<String>> create() {
         return node_async(state -> {
             WorkflowContext context = WorkflowContext.getContext(state);
+            if (context.getGenerationType() != null) {
+                log.info("[SmartRouterNode] 使用上下文已有生成类型: {}", context.getGenerationType().getType());
+                context.setCurrentStep("smart_router");
+                return WorkflowContext.saveContext(context);
+            }
             String enhancedPrompt = context.getEnhancedPrompt();
             log.info("[SmartRouterNode] 开始智能路由，增强提示词: {}", enhancedPrompt);
             // enhancedPrompt，判断应使用哪种代码生成策略，设置 generationType

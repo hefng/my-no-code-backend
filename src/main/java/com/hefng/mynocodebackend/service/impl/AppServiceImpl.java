@@ -7,10 +7,14 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hefng.mynocodebackend.ai.AiCodegenServiceFaced;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
+import com.hefng.mynocodebackend.ai.service.AiCodeGenTypeRoutingService;
 import com.hefng.mynocodebackend.common.ErrorCode;
-import com.hefng.mynocodebackend.constant.AppConstant;import com.hefng.mynocodebackend.constant.CommonConstant;
+import com.hefng.mynocodebackend.constant.AppConstant;
+import com.hefng.mynocodebackend.constant.CommonConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.exception.ThrowUtils;
+import com.hefng.mynocodebackend.langgraph4j.CodeGenWorkflowWithFlux;
+import com.hefng.mynocodebackend.langgraph4j.enums.WorkflowOperationTypeEnum;
 import com.hefng.mynocodebackend.manager.CosManager;
 import com.hefng.mynocodebackend.mapper.AppMapper;
 import com.hefng.mynocodebackend.model.dto.app.AppQueryRequest;
@@ -28,15 +32,13 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
@@ -62,32 +64,77 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private CosManager cosManager;
 
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+
+    @Value("${app.codegen.agent.enabled:false}")
+    private boolean agentWorkflowEnabled;
+
+    @Value("${app.codegen.agent.fallback-to-legacy:true}")
+    private boolean agentWorkflowFallbackToLegacy;
+
     @Override
-    public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
+    public Flux<String> chatToGenCode(Long appId, String userMessage, Boolean isAgent, User loginUser) {
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
-        ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
 
         // 2. 获取应用信息
         App app = getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
         ThrowUtils.throwIf(!app.getAppOwnerId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
 
-        // 3. 如果用户输入的消息为空，使用应用的 initPrompt 作为用户输入的消息
+        // 3. 根据原始用户输入判定操作类型：如果用户输入的消息与应用的 initPrompt 相同，则判定为 CREATE 操作；否则为 MODIFY 操作
+        WorkflowOperationTypeEnum operationType = userMessage.equals(app.getInitPrompt())
+                ? WorkflowOperationTypeEnum.CREATE
+                : WorkflowOperationTypeEnum.MODIFY;
+
+        // 4. 如果用户输入的消息为空，使用应用的 initPrompt 作为生成输入
         String initPrompt = app.getInitPrompt();
         if (StrUtil.isBlank(userMessage)) {
             userMessage = initPrompt;
         }
+        ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        final String finalUserMessage = userMessage;
+        CodegenTypeEnum codegenTypeEnum = resolveCodegenType(app);
 
-        // 4. 根据应用已有的 codegenType 路由到对应的生成策略
+        // 5. 传统路径（默认）
+        if (!Boolean.TRUE.equals(isAgent)) {
+            return aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
+        }
+        // 6. Agent 路径受配置开关控制，便于灰度和回滚
+        if (!agentWorkflowEnabled) {
+            log.info("Agent 工作流未启用，回退传统代码生成，appId={}", appId);
+            return aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
+        }
+        log.info("Agent 工作流执行，appId={}, operationType={}, codegenType={}",
+                appId, operationType, codegenTypeEnum.getType());
+
+        Flux<String> workflowFlux = new CodeGenWorkflowWithFlux()
+                .executeWorkflowWithFlux(finalUserMessage, appId, operationType, codegenTypeEnum);
+        if (!agentWorkflowFallbackToLegacy) {
+            return workflowFlux;
+        }
+        return workflowFlux.onErrorResume(error -> {
+            log.error("Agent 工作流执行失败，回退传统代码生成，appId={}, operationType={}", appId, operationType, error);
+            return aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
+        });
+    }
+
+    private CodegenTypeEnum resolveCodegenType(App app) {
+        String initPrompt = app.getInitPrompt();
+        if (app.getCodegenType() == null) {
+            CodegenTypeEnum routingResult = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+            String codegenType = routingResult != null ? routingResult.getType() : null;
+            // 降级策略：如果 AI 推荐失败，则默认生成 HTML 代码
+            app.setCodegenType(Objects.requireNonNullElse(codegenType, AppConstant.DEFAULT_CODEGEN_TYPE));
+        }
         String finalCodegenType = app.getCodegenType();
         CodegenTypeEnum codegenTypeEnum = CodegenTypeEnum.getByType(finalCodegenType);
         if (codegenTypeEnum == null) {
-            // 兜底：未知类型默认走 HTML 生成，避免因配置错误导致整个请求失败
-            log.warn("未知的 codegenType={}，appId={}，降级为 HTML 生成", finalCodegenType, appId);
-            codegenTypeEnum = CodegenTypeEnum.HTML;
+            log.warn("未知的 codegenType={}，appId={}，降级为 HTML 生成", finalCodegenType, app.getId());
+            return CodegenTypeEnum.HTML;
         }
-        return aiCodegenServiceFaced.generateAndSaveCodeWithStream(userMessage, codegenTypeEnum, appId);
+        return codegenTypeEnum;
     }
 
     /**

@@ -17,20 +17,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 图片搜集工具 - 调用 Pexels API 搜索图片，每次固定返回 12 张图片 URL
+ * 图片搜集工具 - 调用 Pexels API 搜索图片，每次固定返回 3 张图片 URL
  */
 @Slf4j
 @Component
 public class PexelsImageSearchTool {
 
     private static final String PEXELS_SEARCH_URL = "https://api.pexels.com/v1/search";
-    private static final int PER_PAGE = 12;
+    private static final int PER_PAGE = 3;
 
     @Value("${pexels.api-key}")
     private String apiKey;
 
     /**
-     * 根据关键词搜索图片，返回图片 URL 列表（最多 12 张）
+     * 根据关键词搜索图片，返回图片 URL 列表（每次最多 3 张）
      *
      * @param query 搜索关键词
      * @return 图片 URL 列表

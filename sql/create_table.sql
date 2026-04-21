@@ -58,3 +58,7 @@ create table if not exists chat_history
     index idx_userId (userId),
     index idx_appId_createTime (appId, createTime)
 ) comment '历史对话' collate = utf8mb4_unicode_ci;
+
+-- 应用表添加 isAgent 字段
+alter table app
+    add column isAgent tinyint default 0 not null comment '是否是agent模式生成的应用' after codegenType;

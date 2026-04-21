@@ -1,6 +1,7 @@
 package com.hefng.mynocodebackend.langgraph4j.state;
 
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
+import com.hefng.mynocodebackend.langgraph4j.enums.WorkflowOperationTypeEnum;
 import com.hefng.mynocodebackend.langgraph4j.entity.ImageResource;
 import com.hefng.mynocodebackend.langgraph4j.entity.QualityResult;
 import lombok.AllArgsConstructor;
@@ -79,6 +80,12 @@ public class WorkflowContext implements Serializable {
     private Long appId;
 
     /**
+     * 操作类型（首次创建 / 会话式修改）
+     */
+    @Builder.Default
+    private WorkflowOperationTypeEnum operationType = WorkflowOperationTypeEnum.CREATE;
+
+    /**
      * 代码质量检查结果
      */
     private QualityResult qualityResult;
@@ -137,6 +144,9 @@ public class WorkflowContext implements Serializable {
         }
         if (codeQualityRetryExhausted == null) {
             codeQualityRetryExhausted = false;
+        }
+        if (operationType == null) {
+            operationType = WorkflowOperationTypeEnum.CREATE;
         }
     }
 }

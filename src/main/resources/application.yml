@@ -91,3 +91,8 @@ pexels:
 dashscope:
   api-key: <Your API Key>
   model-name: "wanx2.0-t2i-turbo"
+app:
+  codegen:
+    agent:
+      enabled: false
+      fallback-to-legacy: true
