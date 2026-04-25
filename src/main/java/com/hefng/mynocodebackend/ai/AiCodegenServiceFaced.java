@@ -21,8 +21,6 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.util.concurrent.CompletableFuture;
-
 import java.io.File;
 import java.util.Map;
 
@@ -127,17 +125,17 @@ public class AiCodegenServiceFaced {
                     }
                 })
                 .onCompleteResponse(response -> {
-                    // AI 代码生成完成后，异步触发 npm i + npm run build
-                    // 使用虚拟线程执行，不阻塞当前响应流
-                    CompletableFuture<Void> buildFuture = vueProjectBuilder.buildAsync(appId);
-                    buildFuture.whenComplete((result, error) -> {
-                        if (error != null) {
-                            log.error("[VueProject] Vue 项目构建失败, appId={}", appId, error);
-                        } else {
+                    Thread.ofVirtual().name("vue-build-" + appId).start(() -> {
+                        try {
+                            vueProjectBuilder.doBuild(appId, line ->
+                                    sink.tryEmitNext(buildEventJson(SseEventTypeEnum.BUILD_LOG, line)));
                             log.info("[VueProject] Vue 项目构建成功, appId={}", appId);
+                        } catch (Exception e) {
+                            log.error("[VueProject] Vue 项目构建失败, appId={}", appId, e);
+                        } finally {
+                            sink.tryEmitComplete();
                         }
                     });
-                    sink.tryEmitComplete();
                 })
                 .onError(error -> {
                     log.error("[VueProject] 流式生成异常, appId={}", appId, error);

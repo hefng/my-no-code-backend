@@ -16,6 +16,7 @@ public enum SseEventTypeEnum {
     THOUGHT("thought"),
     ANSWER("answer"),
     WORKFLOW_STEP("workflow_step"),
+    BUILD_LOG("build_log"),
     DONE("done");
 
     private final String value;

@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
+import java.util.function.Consumer;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -62,9 +63,12 @@ public class VueProjectBuilder {
      * @throws Exception 任意步骤失败时抛出
      */
     public boolean doBuild(Long appId) throws Exception {
+        return doBuild(appId, null);
+    }
+
+    public boolean doBuild(Long appId, Consumer<String> progressCallback) throws Exception {
         String projectDir = buildProjectDir(appId);
 
-        // 校验项目目录是否存在
         File dir = new File(projectDir);
         if (!dir.exists() || !dir.isDirectory()) {
             return false;
@@ -72,11 +76,8 @@ public class VueProjectBuilder {
 
         log.info("[VueBuilder] 开始构建 Vue 项目, appId={}, dir={}", appId, projectDir);
 
-        // 第一步：npm i（安装依赖）
-        runCommand(projectDir, "npm i");
-
-        // 第二步：npm run build（打包）
-        runCommand(projectDir, "npm run build");
+        runCommand(projectDir, "npm i", progressCallback);
+        runCommand(projectDir, "npm run build", progressCallback);
 
         log.info("[VueBuilder] Vue 项目构建完成, appId={}, distDir={}/dist", appId, projectDir);
         return true;
@@ -91,27 +92,27 @@ public class VueProjectBuilder {
      * @param command 要执行的命令
      * @throws Exception 命令执行失败或退出码非 0 时抛出
      */
-    private void runCommand(String workDir, String command) throws Exception {
+    private void runCommand(String workDir, String command, Consumer<String> progressCallback) throws Exception {
         log.info("[VueBuilder] 执行命令: {} (workDir={})", command, workDir);
 
-        // 根据操作系统选择 shell
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         ProcessBuilder pb = isWindows
                 ? new ProcessBuilder("cmd", "/c", command)
                 : new ProcessBuilder("sh", "-c", command);
 
         pb.directory(new File(workDir));
-        // 将 stderr 合并到 stdout，统一读取
         pb.redirectErrorStream(true);
 
         Process process = pb.start();
 
-        // 读取命令输出，避免缓冲区满导致进程阻塞
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 log.debug("[VueBuilder][{}] {}", command, line);
+                if (progressCallback != null) {
+                    progressCallback.accept(line);
+                }
             }
         }
 

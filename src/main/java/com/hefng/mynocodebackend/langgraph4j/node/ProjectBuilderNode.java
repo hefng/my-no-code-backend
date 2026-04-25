@@ -10,6 +10,7 @@ import org.bsc.langgraph4j.action.AsyncNodeAction;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
 
 import java.io.File;
+import java.util.function.Consumer;
 
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
@@ -20,6 +21,10 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 public class ProjectBuilderNode {
 
     public static AsyncNodeAction<MessagesState<String>> create() {
+        return create(null);
+    }
+
+    public static AsyncNodeAction<MessagesState<String>> create(Consumer<String> progressCallback) {
         return node_async(state -> {
             WorkflowContext context = WorkflowContext.getContext(state);
             String generatedCodeDir = context.getGeneratedCodeDir();
@@ -27,10 +32,9 @@ public class ProjectBuilderNode {
             log.info("[ProjectBuilderNode] 开始构建项目，代码目录: {}", generatedCodeDir);
 
             try {
-                // 此节点仅由条件边在 vue-project 类型下进入
                 Long appId = context.getAppId();
                 VueProjectBuilder builder = SpringContextUtil.getBean(VueProjectBuilder.class);
-                boolean success = builder.doBuild(appId);
+                boolean success = builder.doBuild(appId, progressCallback);
                 if (!success) {
                     throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Vue 项目构建失败");
                 }

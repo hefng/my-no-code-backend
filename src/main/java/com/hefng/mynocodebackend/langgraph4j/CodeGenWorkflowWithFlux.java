@@ -23,6 +23,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
@@ -51,6 +52,10 @@ public class CodeGenWorkflowWithFlux {
      * 创建完整工作流
      */
     public CompiledGraph<MessagesState<String>> createWorkflow() {
+        return createWorkflow(null);
+    }
+
+    public CompiledGraph<MessagesState<String>> createWorkflow(Consumer<String> buildProgressCallback) {
         try {
             return new MessagesStateGraph<String>()
                     .addNode("operation_router", OperationRouterNode.create())
@@ -59,7 +64,7 @@ public class CodeGenWorkflowWithFlux {
                     .addNode("router", SmartRouterNode.create())
                     .addNode("code_generator", CodeGeneratorNode.create())
                     .addNode("code_quality_checker", CodeQualityCheckerNode.create())
-                    .addNode("project_builder", ProjectBuilderNode.create())
+                    .addNode("project_builder", ProjectBuilderNode.create(buildProgressCallback))
                     .addEdge(START, "operation_router")
                     .addConditionalEdges("operation_router", buildOperationRouter(), Map.of(
                             CREATE_ROUTE, "image_collector",
@@ -135,7 +140,12 @@ public class CodeGenWorkflowWithFlux {
                                                 WorkflowOperationTypeEnum operationType,
                                                 CodegenTypeEnum generationType) {
         return Flux.<String>create(sink -> Thread.startVirtualThread(() -> {
-            CompiledGraph<MessagesState<String>> workflow = createWorkflow();
+            Consumer<String> buildProgressCallback = line -> {
+                if (!sink.isCancelled()) {
+                    sink.next(buildEventOutput(SseEventTypeEnum.BUILD_LOG.getValue(), line));
+                }
+            };
+            CompiledGraph<MessagesState<String>> workflow = createWorkflow(buildProgressCallback);
             WorkflowContext initialContext = WorkflowContext.builder()
                     .appId(appId)
                     .originalPrompt(originalPrompt)
