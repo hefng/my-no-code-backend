@@ -1,5 +1,6 @@
 package com.hefng.mynocodebackend.controller;
 
+import cn.hutool.core.lang.TypeReference;
 import cn.hutool.json.JSONUtil;
 import com.hefng.mynocodebackend.ai.service.AiCodeGenTypeRoutingService;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
@@ -22,6 +23,7 @@ import com.hefng.mynocodebackend.model.vo.AppVO;
 import com.hefng.mynocodebackend.service.AppService;
 import com.hefng.mynocodebackend.service.ChatHistoryService;
 import com.hefng.mynocodebackend.service.UserService;
+import com.hefng.mynocodebackend.utils.RedisCacheUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
 import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
@@ -63,6 +66,9 @@ public class AppController {
 
     @Resource
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+
+    @Resource
+    private RedisCacheUtil redisCacheUtil;
 
     /**
      * 调用 AI 生成代码（流式 SSE）
@@ -374,21 +380,15 @@ public class AppController {
         if (appQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        
         User loginUser = userService.getLoginUser(request);
-        
         long current = appQueryRequest.getCurrent();
         long size = appQueryRequest.getPageSize();
-        
         // 限制每页最多 20 个
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR, "每页最多 20 个");
-        
         // 只查询自己的应用
         appQueryRequest.setAppOwnerId(loginUser.getId());
-        
         Page<App> appPage = appService.page(new Page<>(current, size),
                 appService.getQueryWrapper(appQueryRequest));
-        
         Page<AppVO> appVOPage = new Page<>(current, size, appPage.getTotalRow());
         List<AppVO> appVOList = appService.getAppVO(appPage.getRecords());
         appVOPage.setRecords(appVOList);
@@ -407,23 +407,31 @@ public class AppController {
         if (appQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        
+
         long current = appQueryRequest.getCurrent();
         long size = appQueryRequest.getPageSize();
-        
+
         // 限制每页最多 20 个
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR, "每页最多 20 个");
-        
-        // 查询精选应用（优先级为99）
-        QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
-        queryWrapper.and(APP.PRIORITY.eq(AppConstant.MAX_PRIORITY));
 
-        Page<App> appPage = appService.page(new Page<>(current, size), queryWrapper);
-        
-        Page<AppVO> appVOPage = new Page<>(current, size, appPage.getTotalRow());
-        List<AppVO> appVOList = appService.getAppVO(appPage.getRecords());
-        appVOPage.setRecords(appVOList);
-        
+        Page<AppVO> appVOPage = redisCacheUtil.getWithCache(
+                appQueryRequest,
+                "app:featured:list:",
+                5,
+                TimeUnit.MINUTES,
+                () -> {
+                    QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
+                    queryWrapper.and(APP.PRIORITY.eq(AppConstant.MAX_PRIORITY));
+                    Page<App> appPage = appService.page(new Page<>(current, size), queryWrapper);
+                    Page<AppVO> result = new Page<>(current, size, appPage.getTotalRow());
+                    List<AppVO> appVOList = appService.getAppVO(appPage.getRecords());
+                    result.setRecords(appVOList);
+                    return result;
+                },
+                new TypeReference<>() {
+                }
+        );
+
         return ResultUtils.success(appVOPage);
     }
 
