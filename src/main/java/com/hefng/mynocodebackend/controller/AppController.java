@@ -24,6 +24,7 @@ import com.hefng.mynocodebackend.service.AppService;
 import com.hefng.mynocodebackend.service.ChatHistoryService;
 import com.hefng.mynocodebackend.service.UserService;
 import com.hefng.mynocodebackend.utils.RedisCacheUtil;
+import com.hefng.mynocodebackend.utils.SseEventBuilder;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
@@ -176,9 +177,12 @@ public class AppController {
                         log.error("保存失败结果到对话历史失败, traceId={}, appId={}", traceId, appId, e);
                     }
                 })
-                .onErrorResume(error -> Flux.just(JSONUtil.toJsonStr(
-                        java.util.Map.of("event", "workflow_error", "d", StringUtils.defaultIfBlank(error.getMessage(), "对话失败"))
-                )))
+                .onErrorResume(error -> Flux.just(
+                        SseEventBuilder.build(
+                                SseEventTypeEnum.WORKFLOW_ERROR,
+                                StringUtils.defaultIfBlank(error.getMessage(), "对话失败")
+                        )
+                ))
                 .doFinally(signalType -> log.info("chatToGenCode 请求结束, traceId={}, appId={}, signal={}",
                         traceId, appId, signalType.name()))
                 .map(chunk -> {

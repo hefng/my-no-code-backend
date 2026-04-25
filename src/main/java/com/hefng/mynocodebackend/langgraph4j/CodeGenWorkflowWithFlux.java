@@ -1,6 +1,5 @@
 package com.hefng.mynocodebackend.langgraph4j;
 
-import cn.hutool.json.JSONUtil;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.exception.BusinessException;
@@ -9,6 +8,7 @@ import com.hefng.mynocodebackend.langgraph4j.entity.QualityResult;
 import com.hefng.mynocodebackend.langgraph4j.node.*;
 import com.hefng.mynocodebackend.langgraph4j.state.WorkflowContext;
 import com.hefng.mynocodebackend.model.enums.SseEventTypeEnum;
+import com.hefng.mynocodebackend.utils.SseEventBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphRepresentation;
@@ -31,7 +31,6 @@ import static org.bsc.langgraph4j.StateGraph.START;
 @Slf4j
 public class CodeGenWorkflowWithFlux {
 
-    private static final String ERROR_EVENT = "workflow_error";
     private static final Map<String, String> WORKFLOW_STEP_TITLES = Map.of(
             "image_collector", "收集图片",
             "prompt_enhancer", "增强提示词",
@@ -142,7 +141,7 @@ public class CodeGenWorkflowWithFlux {
         return Flux.<String>create(sink -> Thread.startVirtualThread(() -> {
             Consumer<String> buildProgressCallback = line -> {
                 if (!sink.isCancelled()) {
-                    sink.next(buildEventOutput(SseEventTypeEnum.BUILD_LOG.getValue(), line));
+                    sink.next(SseEventBuilder.build(SseEventTypeEnum.BUILD_LOG, line));
                 }
             };
             CompiledGraph<MessagesState<String>> workflow = createWorkflow(buildProgressCallback);
@@ -180,13 +179,13 @@ public class CodeGenWorkflowWithFlux {
                     nodeCounter++;
                 }
                 log.info("代码生成工作流执行完成");
-                sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
+                sink.next(SseEventBuilder.build(SseEventTypeEnum.DONE, ""));
                 sink.complete();
             } catch (Exception e) {
                 log.error("代码生成工作流执行失败", e);
                 String errorMessage = e.getMessage() == null ? "工作流执行失败" : e.getMessage();
-                sink.next(buildEventOutput(ERROR_EVENT, errorMessage));
-                sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
+                sink.next(SseEventBuilder.build(SseEventTypeEnum.WORKFLOW_ERROR, errorMessage));
+                sink.next(SseEventBuilder.build(SseEventTypeEnum.DONE, ""));
                 sink.complete();
             }
         })).subscribeOn(Schedulers.boundedElastic());
@@ -203,13 +202,6 @@ public class CodeGenWorkflowWithFlux {
         payload.put("node", step.node());
         payload.put("title", title);
         payload.put("status", "completed");
-        return buildEventOutput(SseEventTypeEnum.WORKFLOW_STEP.getValue(), payload);
-    }
-
-    private String buildEventOutput(String event, Object data) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("event", event);
-        payload.put("d", data);
-        return JSONUtil.toJsonStr(payload);
+        return SseEventBuilder.build(SseEventTypeEnum.WORKFLOW_STEP, payload);
     }
 }

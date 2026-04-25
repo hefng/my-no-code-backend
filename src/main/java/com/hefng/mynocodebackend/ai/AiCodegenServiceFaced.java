@@ -1,6 +1,5 @@
 package com.hefng.mynocodebackend.ai;
 
-import cn.hutool.json.JSONUtil;
 import com.hefng.mynocodebackend.ai.factory.AiCodeGeneratorServiceFactory;
 import com.hefng.mynocodebackend.ai.factory.VueProjectCodegenServiceFactory;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
@@ -14,6 +13,7 @@ import com.hefng.mynocodebackend.core.parser.CodeParserExecutor;
 import com.hefng.mynocodebackend.core.saver.CodeFileSaverExecutor;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.model.enums.SseEventTypeEnum;
+import com.hefng.mynocodebackend.utils.SseEventBuilder;
 import dev.langchain4j.service.TokenStream;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.io.File;
-import java.util.Map;
 
 /**
  * AI 代码生成服务门面类
@@ -116,19 +115,19 @@ public class AiCodegenServiceFaced {
                 .onPartialThinking(partialThinking -> {
                     String text = partialThinking.text();
                     if (text != null && !text.isEmpty()) {
-                        sink.tryEmitNext(buildEventJson(SseEventTypeEnum.THOUGHT, text));
+                        sink.tryEmitNext(SseEventBuilder.build(SseEventTypeEnum.THOUGHT, text));
                     }
                 })
                 .onPartialResponse(partialResponse -> {
                     if (partialResponse != null && !partialResponse.isEmpty()) {
-                        sink.tryEmitNext(buildEventJson(SseEventTypeEnum.ANSWER, partialResponse));
+                        sink.tryEmitNext(SseEventBuilder.build(SseEventTypeEnum.ANSWER, partialResponse));
                     }
                 })
                 .onCompleteResponse(response -> {
                     Thread.ofVirtual().name("vue-build-" + appId).start(() -> {
                         try {
                             vueProjectBuilder.doBuild(appId, line ->
-                                    sink.tryEmitNext(buildEventJson(SseEventTypeEnum.BUILD_LOG, line)));
+                                    sink.tryEmitNext(SseEventBuilder.build(SseEventTypeEnum.BUILD_LOG, line)));
                             log.info("[VueProject] Vue 项目构建成功, appId={}", appId);
                         } catch (Exception e) {
                             log.error("[VueProject] Vue 项目构建失败, appId={}", appId, e);
@@ -147,17 +146,6 @@ public class AiCodegenServiceFaced {
     }
 
     /**
-     * 构建 SSE 事件 JSON 字符串
-     * 格式：{"event": "thought"|"answer", "d": "内容"}
-     * <p>
-     * 前端通过 event 字段区分思考流和答案流，通过 d 字段获取内容。
-     * 与现有 HTML 生成的 {"d": "..."} 格式保持向后兼容（前端可通过 event 字段是否存在来判断类型）。
-     */
-    private String buildEventJson(SseEventTypeEnum eventType, String content) {
-        return JSONUtil.toJsonStr(Map.of("event", eventType.getValue(), "d", content));
-    }
-
-    /**
      * HTML / MULTI_FILE 流式生成，支持深度思考过程输出
      * <p>
      * 与 VUE_PROJECT 逻辑相同：通过 onPartialThinking/onPartialResponse 分别推送 thought/answer 事件。
@@ -172,13 +160,13 @@ public class AiCodegenServiceFaced {
                 .onPartialThinking(partialThinking -> {
                     String text = partialThinking.text();
                     if (text != null && !text.isEmpty()) {
-                        sink.tryEmitNext(buildEventJson(SseEventTypeEnum.THOUGHT, text));
+                        sink.tryEmitNext(SseEventBuilder.build(SseEventTypeEnum.THOUGHT, text));
                     }
                 })
                 .onPartialResponse(partialResponse -> {
                     if (partialResponse != null && !partialResponse.isEmpty()) {
                         answerBuilder.append(partialResponse);
-                        sink.tryEmitNext(buildEventJson(SseEventTypeEnum.ANSWER, partialResponse));
+                        sink.tryEmitNext(SseEventBuilder.build(SseEventTypeEnum.ANSWER, partialResponse));
                     }
                 })
                 .onCompleteResponse(response -> {
