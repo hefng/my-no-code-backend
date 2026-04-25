@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
 public class AiCodeGeneratorServiceFactory {
 
     @Resource
-    private ChatModel chatModel;
+    private ChatModel simpleChatModel;
 
     @Resource
     private StreamingChatModel reasoningStreamingChatModel;
@@ -38,7 +38,7 @@ public class AiCodeGeneratorServiceFactory {
         chatHistoryService.loadChatHistoryToMemory(appId, memory, 20);
         return AiServices.builder(AiCodegenService.class)
                 .chatMemory(memory)
-                .chatModel(chatModel)
+                .chatModel(simpleChatModel)
                 .streamingChatModel(reasoningStreamingChatModel)
                 .build();
     }

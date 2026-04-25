@@ -23,10 +23,10 @@ public class MultiFileCodeFileSaver extends CodeFileSaverTemplate<MultiFileCodeR
             FileUtil.writeString(htmlCode, uniquePath + File.separator + "index.html", StandardCharsets.UTF_8);
         }
         if (!StringUtil.isEmpty(cssCode)) {
-            FileUtil.writeString(htmlCode, uniquePath + File.separator + "index.css", StandardCharsets.UTF_8);
+            FileUtil.writeString(cssCode, uniquePath + File.separator + "style.css", StandardCharsets.UTF_8);
         }
         if (!StringUtil.isEmpty(jsCode)) {
-            FileUtil.writeString(htmlCode, uniquePath + File.separator + "index.js", StandardCharsets.UTF_8);
+            FileUtil.writeString(jsCode, uniquePath + File.separator + "script.js", StandardCharsets.UTF_8);
         }
         return new File(uniquePath);
     }

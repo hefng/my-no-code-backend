@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 public class ImageCollectionServiceFactory {
 
     @Resource
-    private ChatModel chatModel;
+    private ChatModel simpleChatModel;
 
     @Resource
     private PexelsImageSearchTool pexelsImageSearchTool;
@@ -33,7 +33,7 @@ public class ImageCollectionServiceFactory {
     @Bean
     public AiImageCollectService createImageCollectionService() {
         return AiServices.builder(AiImageCollectService.class)
-                .chatModel(chatModel)
+                .chatModel(simpleChatModel)
                 .tools(
                         pexelsImageSearchTool,
                         mermaidDiagramTool,

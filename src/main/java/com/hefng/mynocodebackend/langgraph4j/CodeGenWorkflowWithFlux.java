@@ -134,53 +134,52 @@ public class CodeGenWorkflowWithFlux {
                                                 Long appId,
                                                 WorkflowOperationTypeEnum operationType,
                                                 CodegenTypeEnum generationType) {
-        return Flux.<String>create(sink -> {
-                    CompiledGraph<MessagesState<String>> workflow = createWorkflow();
-                    WorkflowContext initialContext = WorkflowContext.builder()
-                            .appId(appId)
-                            .originalPrompt(originalPrompt)
-                            .operationType(operationType)
-                            .generationType(generationType)
-                            .currentStep("init")
-                            .build();
+        return Flux.<String>create(sink -> Thread.startVirtualThread(() -> {
+            CompiledGraph<MessagesState<String>> workflow = createWorkflow();
+            WorkflowContext initialContext = WorkflowContext.builder()
+                    .appId(appId)
+                    .originalPrompt(originalPrompt)
+                    .operationType(operationType)
+                    .generationType(generationType)
+                    .currentStep("init")
+                    .build();
 
-                    GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
-                    log.info("工作流图:\n{}", graph.content());
-                    log.info("开始执行代码生成工作流");
+            GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
+            log.info("工作流图:\n{}", graph.content());
+            log.info("开始执行代码生成工作流");
 
-                    try {
-                        int nodeCounter = 1;
-                        int workflowStepCounter = 1;
-                        for (NodeOutput<MessagesState<String>> step : workflow.stream(
-                                Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext))) {
-                            if (sink.isCancelled()) {
-                                log.info("工作流流式输出已取消");
-                                return;
-                            }
-                            WorkflowContext currentContext = WorkflowContext.getContext(step.state());
-                            log.info("--- 节点 {} 完成，节点：{} ---", nodeCounter, step.node());
-                            if (currentContext != null) {
-                                log.info("当前上下文: {}", currentContext);
-                            }
-                            String stepOutput = buildStepOutput(workflowStepCounter, step);
-                            if (stepOutput != null) {
-                                sink.next(stepOutput);
-                                workflowStepCounter++;
-                            }
-                            nodeCounter++;
-                        }
-                        log.info("代码生成工作流执行完成");
-                        sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
-                        sink.complete();
-                    } catch (Exception e) {
-                        log.error("代码生成工作流执行失败", e);
-                        String errorMessage = e.getMessage() == null ? "工作流执行失败" : e.getMessage();
-                        sink.next(buildEventOutput(ERROR_EVENT, errorMessage));
-                        sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
-                        sink.complete();
+            try {
+                int nodeCounter = 1;
+                int workflowStepCounter = 1;
+                for (NodeOutput<MessagesState<String>> step : workflow.stream(
+                        Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext))) {
+                    if (sink.isCancelled()) {
+                        log.info("工作流流式输出已取消");
+                        return;
                     }
-                })
-                .subscribeOn(Schedulers.boundedElastic());
+                    WorkflowContext currentContext = WorkflowContext.getContext(step.state());
+                    log.info("--- 节点 {} 完成，节点：{} ---", nodeCounter, step.node());
+                    if (currentContext != null) {
+                        log.info("当前上下文: {}", currentContext);
+                    }
+                    String stepOutput = buildStepOutput(workflowStepCounter, step);
+                    if (stepOutput != null) {
+                        sink.next(stepOutput);
+                        workflowStepCounter++;
+                    }
+                    nodeCounter++;
+                }
+                log.info("代码生成工作流执行完成");
+                sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
+                sink.complete();
+            } catch (Exception e) {
+                log.error("代码生成工作流执行失败", e);
+                String errorMessage = e.getMessage() == null ? "工作流执行失败" : e.getMessage();
+                sink.next(buildEventOutput(ERROR_EVENT, errorMessage));
+                sink.next(buildEventOutput(SseEventTypeEnum.DONE.getValue(), ""));
+                sink.complete();
+            }
+        })).subscribeOn(Schedulers.boundedElastic());
     }
 
     private String buildStepOutput(int stepCounter,
