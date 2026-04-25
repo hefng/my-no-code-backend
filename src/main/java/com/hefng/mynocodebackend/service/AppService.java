@@ -6,6 +6,7 @@ import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.vo.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -22,10 +23,11 @@ public interface AppService extends IService<App> {
      *
      * @param appId       应用id
      * @param userMessage 用户输入的消息
+     * @param isAgent     是否使用 Agent 模式
      * @param loginUser   当前登录用户
-     * @return AI 生成的代码流
+     * @return SSE 事件流
      */
-    Flux<String> chatToGenCode(Long appId, String userMessage, Boolean isAgent, User loginUser);
+    Flux<ServerSentEvent<String>> chatToGenCode(Long appId, String userMessage, Boolean isAgent, User loginUser);
 
     /**
      * 部署应用

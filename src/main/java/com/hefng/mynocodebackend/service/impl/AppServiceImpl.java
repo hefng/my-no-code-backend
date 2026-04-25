@@ -20,12 +20,15 @@ import com.hefng.mynocodebackend.mapper.AppMapper;
 import com.hefng.mynocodebackend.model.dto.app.AppQueryRequest;
 import com.hefng.mynocodebackend.model.entity.App;
 import com.hefng.mynocodebackend.model.entity.User;
+import com.hefng.mynocodebackend.model.enums.ChatMessageTypeEnum;
+import com.hefng.mynocodebackend.model.enums.SseEventTypeEnum;
 import com.hefng.mynocodebackend.model.vo.AppVO;
 import com.hefng.mynocodebackend.model.vo.UserVO;
 import com.hefng.mynocodebackend.service.AppService;
 import com.hefng.mynocodebackend.service.ChatHistoryService;
 import com.hefng.mynocodebackend.service.UserService;
 import com.hefng.mynocodebackend.utils.SqlUtils;
+import com.hefng.mynocodebackend.utils.SseEventBuilder;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
@@ -33,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -74,67 +78,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private boolean agentWorkflowFallbackToLegacy;
 
     @Override
-    public Flux<String> chatToGenCode(Long appId, String userMessage, Boolean isAgent, User loginUser) {
-        // 1. 参数校验
-        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
-
-        // 2. 获取应用信息
-        App app = getById(appId);
-        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
-        ThrowUtils.throwIf(!app.getAppOwnerId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
-
-        // 3. 根据原始用户输入判定操作类型：如果用户输入的消息与应用的 initPrompt 相同，则判定为 CREATE 操作；否则为 MODIFY 操作
-        WorkflowOperationTypeEnum operationType = userMessage.equals(app.getInitPrompt())
-                ? WorkflowOperationTypeEnum.CREATE
-                : WorkflowOperationTypeEnum.MODIFY;
-
-        // 4. 如果用户输入的消息为空，使用应用的 initPrompt 作为生成输入
-        String initPrompt = app.getInitPrompt();
-        if (StrUtil.isBlank(userMessage)) {
-            userMessage = initPrompt;
-        }
-        ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
-        final String finalUserMessage = userMessage;
-        CodegenTypeEnum codegenTypeEnum = resolveCodegenType(app);
-
-        // 5. 传统路径（默认）
-        if (!Boolean.TRUE.equals(isAgent)) {
-            return aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
-        }
-        // 6. Agent 路径受配置开关控制，便于灰度和回滚
-        if (!agentWorkflowEnabled) {
-            log.info("Agent 工作流未启用，回退传统代码生成，appId={}", appId);
-            return aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
-        }
-        log.info("Agent 工作流执行，appId={}, operationType={}, codegenType={}",
-                appId, operationType, codegenTypeEnum.getType());
-
-        Flux<String> workflowFlux = new CodeGenWorkflowWithFlux()
-                .executeWorkflowWithFlux(finalUserMessage, appId, operationType, codegenTypeEnum);
-        if (!agentWorkflowFallbackToLegacy) {
-            return workflowFlux;
-        }
-        return workflowFlux.onErrorResume(error -> {
-            log.error("Agent 工作流执行失败，回退传统代码生成，appId={}, operationType={}", appId, operationType, error);
-            return aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
-        });
-    }
-
-    private CodegenTypeEnum resolveCodegenType(App app) {
-        String initPrompt = app.getInitPrompt();
-        if (app.getCodegenType() == null) {
-            CodegenTypeEnum routingResult = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
-            String codegenType = routingResult != null ? routingResult.getType() : null;
-            // 降级策略：如果 AI 推荐失败，则默认生成 HTML 代码
-            app.setCodegenType(Objects.requireNonNullElse(codegenType, AppConstant.DEFAULT_CODEGEN_TYPE));
-        }
-        String finalCodegenType = app.getCodegenType();
-        CodegenTypeEnum codegenTypeEnum = CodegenTypeEnum.getByType(finalCodegenType);
-        if (codegenTypeEnum == null) {
-            log.warn("未知的 codegenType={}，appId={}，降级为 HTML 生成", finalCodegenType, app.getId());
-            return CodegenTypeEnum.HTML;
-        }
-        return codegenTypeEnum;
+    public Flux<ServerSentEvent<String>> chatToGenCode(Long appId, String userMessage, Boolean isAgent, User loginUser) {
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NO_AUTH_ERROR, "用户未登录");
+        return doChatToGenCode(appId, userMessage, isAgent, loginUser);
     }
 
     /**
@@ -310,6 +256,180 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         chatHistoryService.removeByAppId(appId);
         // 再删除应用本身
         return this.removeById(appId);
+    }
+
+    private Flux<ServerSentEvent<String>> doChatToGenCode(Long appId, String userMessage, Boolean isAgent, User loginUser) {
+        // 1. 参数校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
+
+        // 2. 获取应用信息
+        App app = getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        ThrowUtils.throwIf(!app.getAppOwnerId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
+
+        // 3. 根据原始用户输入判定操作类型：如果用户输入的消息与应用的 initPrompt 相同，则判定为 CREATE 操作；否则为 MODIFY 操作
+        WorkflowOperationTypeEnum operationType = userMessage.equals(app.getInitPrompt())
+                ? WorkflowOperationTypeEnum.CREATE
+                : WorkflowOperationTypeEnum.MODIFY;
+
+        // 4. 如果用户输入的消息为空，使用应用的 initPrompt 作为生成输入
+        String initPrompt = app.getInitPrompt();
+        if (StrUtil.isBlank(userMessage)) {
+            userMessage = initPrompt;
+        }
+        ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        final String finalUserMessage = userMessage;
+        chatHistoryService.saveChatMessage(appId, loginUser.getId(), finalUserMessage, ChatMessageTypeEnum.USER.getValue());
+        CodegenTypeEnum codegenTypeEnum = resolveCodegenType(app);
+
+        // 5. 传统路径（默认）
+        Flux<String> rawFlux;
+        if (!Boolean.TRUE.equals(isAgent)) {
+            rawFlux = aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
+            return buildSseResponse(rawFlux, appId, loginUser.getId());
+        }
+        // 6. Agent 路径受配置开关控制，便于灰度和回滚
+        if (!agentWorkflowEnabled) {
+            log.info("Agent 工作流未启用，回退传统代码生成，appId={}", appId);
+            rawFlux = aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
+            return buildSseResponse(rawFlux, appId, loginUser.getId());
+        }
+        log.info("Agent 工作流执行，appId={}, operationType={}, codegenType={}",
+                appId, operationType, codegenTypeEnum.getType());
+
+        rawFlux = new CodeGenWorkflowWithFlux()
+                .executeWorkflowWithFlux(finalUserMessage, appId, operationType, codegenTypeEnum);
+        if (!agentWorkflowFallbackToLegacy) {
+            return buildSseResponse(rawFlux, appId, loginUser.getId());
+        }
+        Flux<String> resilientFlux = rawFlux.onErrorResume(error -> {
+            log.error("Agent 工作流执行失败，回退传统代码生成，appId={}, operationType={}", appId, operationType, error);
+            return aiCodegenServiceFaced.generateAndSaveCodeWithStream(finalUserMessage, codegenTypeEnum, appId);
+        });
+        return buildSseResponse(resilientFlux, appId, loginUser.getId());
+    }
+
+    private CodegenTypeEnum resolveCodegenType(App app) {
+        String initPrompt = app.getInitPrompt();
+        if (app.getCodegenType() == null) {
+            CodegenTypeEnum routingResult = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+            String codegenType = routingResult != null ? routingResult.getType() : null;
+            // 降级策略：如果 AI 推荐失败，则默认生成 HTML 代码
+            app.setCodegenType(Objects.requireNonNullElse(codegenType, AppConstant.DEFAULT_CODEGEN_TYPE));
+        }
+        String finalCodegenType = app.getCodegenType();
+        CodegenTypeEnum codegenTypeEnum = CodegenTypeEnum.getByType(finalCodegenType);
+        if (codegenTypeEnum == null) {
+            log.warn("未知的 codegenType={}，appId={}，降级为 HTML 生成", finalCodegenType, app.getId());
+            return CodegenTypeEnum.HTML;
+        }
+        return codegenTypeEnum;
+    }
+
+    private Flux<ServerSentEvent<String>> buildSseResponse(Flux<String> rawFlux, Long appId, Long userId) {
+        String traceId = UUID.randomUUID().toString().replace("-", "");
+        log.info("chatToGenCode 请求开始, traceId={}, appId={}, userId={}", traceId, appId, userId);
+
+        StringBuilder aiResponseBuilder = new StringBuilder();
+        Flux<ServerSentEvent<String>> messageFlux = rawFlux
+                .doOnNext(chunk -> appendAiResponse(aiResponseBuilder, chunk))
+                .doOnComplete(() -> persistAiResponse(appId, userId, aiResponseBuilder.toString(), traceId))
+                .doOnError(error -> persistAiErrorResponse(appId, userId, aiResponseBuilder.toString(), error, traceId))
+                .onErrorResume(error -> Flux.just(
+                        SseEventBuilder.build(
+                                SseEventTypeEnum.WORKFLOW_ERROR,
+                                StringUtils.defaultIfBlank(error.getMessage(), "对话失败")
+                        )
+                ))
+                .doFinally(signalType -> log.info("chatToGenCode 请求结束, traceId={}, appId={}, signal={}",
+                        traceId, appId, signalType.name()))
+                .map(this::toServerSentEvent);
+
+        Flux<ServerSentEvent<String>> doneFlux = Flux.just(
+                ServerSentEvent.<String>builder()
+                        .event(SseEventTypeEnum.DONE.getValue())
+                        .data("")
+                        .build()
+        );
+        return Flux.concat(messageFlux, doneFlux);
+    }
+
+    private void appendAiResponse(StringBuilder aiResponseBuilder, String chunk) {
+        try {
+            cn.hutool.json.JSONObject json = cn.hutool.json.JSONUtil.parseObj(chunk);
+            String event = json.getStr("event", "");
+            if (SseEventTypeEnum.DONE.getValue().equals(event)) {
+                return;
+            }
+            if (SseEventTypeEnum.WORKFLOW_STEP.getValue().equals(event)) {
+                cn.hutool.json.JSONObject stepPayload = json.getJSONObject("d");
+                if (stepPayload != null) {
+                    Integer step = stepPayload.getInt("step");
+                    String title = stepPayload.getStr("title", "");
+                    String status = stepPayload.getStr("status", "");
+                    if (step != null && StringUtils.isNotBlank(title)) {
+                        aiResponseBuilder.append("第")
+                                .append(step)
+                                .append("步：")
+                                .append(title)
+                                .append("... ");
+                        if ("completed".equals(status)) {
+                            aiResponseBuilder.append("已完成");
+                        } else {
+                            aiResponseBuilder.append(StringUtils.defaultIfBlank(status, "已完成"));
+                        }
+                        aiResponseBuilder.append("\n");
+                    }
+                }
+                return;
+            }
+            String content = json.getStr("d", "");
+            if (!content.isEmpty()) {
+                aiResponseBuilder.append(content);
+            }
+        } catch (Exception ignored) {
+            aiResponseBuilder.append(chunk);
+        }
+    }
+
+    private void persistAiResponse(Long appId, Long userId, String aiResponse, String traceId) {
+        if (StringUtils.isBlank(aiResponse)) {
+            return;
+        }
+        try {
+            chatHistoryService.saveChatMessage(appId, userId, aiResponse, ChatMessageTypeEnum.AI.getValue());
+        } catch (Exception e) {
+            log.error("保存 AI 回答到对话历史失败, traceId={}, appId={}", traceId, appId, e);
+        }
+    }
+
+    private void persistAiErrorResponse(Long appId, Long userId, String partialResponse, Throwable error, String traceId) {
+        String errorMessage = StringUtils.defaultIfBlank(error.getMessage(), "工作流执行失败");
+        String persistMessage = StringUtils.isNotBlank(partialResponse)
+                ? partialResponse + "\n[ERROR] " + errorMessage
+                : "[ERROR] " + errorMessage;
+        try {
+            chatHistoryService.saveChatMessage(appId, userId, persistMessage, ChatMessageTypeEnum.AI.getValue());
+        } catch (Exception e) {
+            log.error("保存失败结果到对话历史失败, traceId={}, appId={}", traceId, appId, e);
+        }
+    }
+
+    private ServerSentEvent<String> toServerSentEvent(String chunk) {
+        String sseEvent = "message";
+        try {
+            cn.hutool.json.JSONObject json = cn.hutool.json.JSONUtil.parseObj(chunk);
+            String eventField = json.getStr("event");
+            if (StringUtils.isNotBlank(eventField)) {
+                sseEvent = eventField;
+            }
+        } catch (Exception ignored) {
+            // ignore
+        }
+        return ServerSentEvent.<String>builder()
+                .event(sseEvent)
+                .data(chunk)
+                .build();
     }
 
     /**

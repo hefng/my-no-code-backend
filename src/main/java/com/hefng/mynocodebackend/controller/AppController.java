@@ -1,7 +1,6 @@
 package com.hefng.mynocodebackend.controller;
 
 import cn.hutool.core.lang.TypeReference;
-import cn.hutool.json.JSONUtil;
 import com.hefng.mynocodebackend.ai.service.AiCodeGenTypeRoutingService;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.annotation.AuthCheck;
@@ -17,14 +16,10 @@ import com.hefng.mynocodebackend.exception.ThrowUtils;
 import com.hefng.mynocodebackend.model.dto.app.*;
 import com.hefng.mynocodebackend.model.entity.App;
 import com.hefng.mynocodebackend.model.entity.User;
-import com.hefng.mynocodebackend.model.enums.ChatMessageTypeEnum;
-import com.hefng.mynocodebackend.model.enums.SseEventTypeEnum;
 import com.hefng.mynocodebackend.model.vo.AppVO;
 import com.hefng.mynocodebackend.service.AppService;
-import com.hefng.mynocodebackend.service.ChatHistoryService;
 import com.hefng.mynocodebackend.service.UserService;
 import com.hefng.mynocodebackend.utils.RedisCacheUtil;
-import com.hefng.mynocodebackend.utils.SseEventBuilder;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
@@ -39,7 +34,6 @@ import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.UUID;
 
 import static com.hefng.mynocodebackend.model.table.AppTableDef.APP;
 
@@ -58,9 +52,6 @@ public class AppController {
 
     @Resource
     private UserService userService;
-
-    @Resource
-    private ChatHistoryService chatHistoryService;
 
     @Resource
     private CosClientConfig cosClientConfig;
@@ -98,122 +89,7 @@ public class AppController {
         ThrowUtils.throwIf(StringUtils.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
 
         User loginUser = userService.getLoginUser(request);
-        String traceId = UUID.randomUUID().toString().replace("-", "");
-        log.info("chatToGenCode 请求开始, traceId={}, appId={}, userId={}, isAgent={}",
-                traceId, appId, loginUser.getId(), isAgent);
-
-        // 在调用服务生成代码之前，先保存用户的输入消息到对话历史中
-        chatHistoryService.saveChatMessage(appId, loginUser.getId(), userMessage, ChatMessageTypeEnum.USER.getValue());
-
-        Flux<String> rawFlux = appService.chatToGenCode(appId, userMessage, isAgent, loginUser);
-
-        // 用于收集完整 AI 回答（思考过程 + 最终答案），流结束后一并保存到对话历史
-        StringBuilder aiResponseBuilder = new StringBuilder();
-
-        // 将原始流的每个 JSON chunk 转换为 SSE 事件
-        // 核心逻辑：从 chunk 中解析 event 字段，决定 SSE event 名称
-        // - Vue 工程化 / Agent 工作流：chunk 带 event 字段时，直接透传为 SSE event 名称
-        // - HTML/MULTI_FILE：chunk 格式为 {"d":"..."} → SSE event = message（保持原有行为）
-        Flux<ServerSentEvent<String>> messageFlux = rawFlux
-                .doOnNext(chunk -> {
-                    // 收集原始内容用于保存对话历史（只收集 d 字段的内容，过滤掉 event 元数据）
-                    try {
-                        cn.hutool.json.JSONObject json = JSONUtil.parseObj(chunk);
-                        String event = json.getStr("event", "");
-                        if (SseEventTypeEnum.DONE.getValue().equals(event)) {
-                            return;
-                        }
-                        if (SseEventTypeEnum.WORKFLOW_STEP.getValue().equals(event)) {
-                            cn.hutool.json.JSONObject stepPayload = json.getJSONObject("d");
-                            if (stepPayload != null) {
-                                Integer step = stepPayload.getInt("step");
-                                String title = stepPayload.getStr("title", "");
-                                String status = stepPayload.getStr("status", "");
-                                if (step != null && StringUtils.isNotBlank(title)) {
-                                    aiResponseBuilder.append("第")
-                                            .append(step)
-                                            .append("步：")
-                                            .append(title)
-                                            .append("... ");
-                                    if ("completed".equals(status)) {
-                                        aiResponseBuilder.append("已完成");
-                                    } else {
-                                        aiResponseBuilder.append(StringUtils.defaultIfBlank(status, "已完成"));
-                                    }
-                                    aiResponseBuilder.append("\n");
-                                }
-                            }
-                            return;
-                        }
-                        String d = json.getStr("d", "");
-                        if (!d.isEmpty()) {
-                            aiResponseBuilder.append(d);
-                        }
-                    } catch (Exception ignored) {
-                        // 解析失败时直接追加原始内容，避免丢失数据
-                        aiResponseBuilder.append(chunk);
-                    }
-                })
-                .doOnComplete(() -> {
-                    // 流结束后保存 AI 完整回答到对话历史
-                    String aiResponse = aiResponseBuilder.toString();
-                    if (StringUtils.isNotBlank(aiResponse)) {
-                        try {
-                            chatHistoryService.saveChatMessage(appId, loginUser.getId(), aiResponse, ChatMessageTypeEnum.AI.getValue());
-                        } catch (Exception e) {
-                            log.error("保存 AI 回答到对话历史失败, traceId={}, appId={}", traceId, appId, e);
-                        }
-                    }
-                })
-                .doOnError(error -> {
-                    String errorMessage = StringUtils.defaultIfBlank(error.getMessage(), "工作流执行失败");
-                    String aiResponse = aiResponseBuilder.toString();
-                    String persistMessage = StringUtils.isNotBlank(aiResponse)
-                            ? aiResponse + "\n[ERROR] " + errorMessage
-                            : "[ERROR] " + errorMessage;
-                    try {
-                        chatHistoryService.saveChatMessage(appId, loginUser.getId(), persistMessage, ChatMessageTypeEnum.AI.getValue());
-                    } catch (Exception e) {
-                        log.error("保存失败结果到对话历史失败, traceId={}, appId={}", traceId, appId, e);
-                    }
-                })
-                .onErrorResume(error -> Flux.just(
-                        SseEventBuilder.build(
-                                SseEventTypeEnum.WORKFLOW_ERROR,
-                                StringUtils.defaultIfBlank(error.getMessage(), "对话失败")
-                        )
-                ))
-                .doFinally(signalType -> log.info("chatToGenCode 请求结束, traceId={}, appId={}, signal={}",
-                        traceId, appId, signalType.name()))
-                .map(chunk -> {
-                    // 解析 chunk 中的 event 字段，决定 SSE event 名称
-                    // Vue 工程化的 chunk 带有 event 字段；HTML 的 chunk 只有 d 字段
-                    String sseEvent = "message";
-                    try {
-                        cn.hutool.json.JSONObject json = JSONUtil.parseObj(chunk);
-                        String eventField = json.getStr("event");
-                        if (StringUtils.isNotBlank(eventField)) {
-                            // thought / answer / workflow_step 等事件，直接使用 event 字段值作为 SSE event 名称
-                            sseEvent = eventField;
-                        }
-                    } catch (Exception ignored) {
-                        // 解析失败时降级为 message 事件
-                    }
-                    return ServerSentEvent.<String>builder()
-                            .event(sseEvent)
-                            .data(chunk)
-                            .build();
-                });
-
-        // done 事件：流结束后通知前端关闭连接
-        Flux<ServerSentEvent<String>> doneFlux = Flux.just(
-                ServerSentEvent.<String>builder()
-                        .event("done")
-                        .data("")
-                        .build()
-        );
-
-        return Flux.concat(messageFlux, doneFlux);
+        return appService.chatToGenCode(appId, userMessage, isAgent, loginUser);
     }
 
     /**
