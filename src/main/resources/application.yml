@@ -30,8 +30,6 @@ spring:
   session:
     timeout: 2592000 # 30天，单位为秒
     store-type: redis
-  profiles:
-    active: local
 # springdoc-openapi
 springdoc:
   group-configs:
@@ -45,39 +43,33 @@ knife4j:
 # AI
 langchain4j:
   open-ai:
-    chat-model:
-      base-url: https://open.bigmodel.cn/api/paas/v4
-      api-key: "<your-api-key>"
-      model-name: glm-4.6
-      log-requests: true
-      log-responses: true
-      max-tokens: 16384
-    streaming-chat-model:
-      base-url: https://open.bigmodel.cn/api/paas/v4
-      api-key: "<your-api-key>"
-      model-name: glm-4.7
-      log-requests: true
-      log-responses: true
-      max-tokens: 65536
-    reasoning-model:
-      base-url: https://open.bigmodel.cn/api/paas/v4
-      api-key: "<your-api-key>"
-      model-name: glm-4.7
-      max-tokens: 65536
+    reasoning-streaming-chat-model:
+      base-url: https://yunwu.ai/v1
+      api-key: ""
+      model-name: gpt-5.4-mini
+      max-tokens: 131072
       return-thinking: true
       temperature: 0.1
-      timeout: 300000 # 300秒
+      timeout: 300000 # 300
+    # 简单任务 AI 模型配置（用于简单的任务）
+    simple-chat-model:
+      base-url: https://yunwu.ai/v1
+      api-key: ""
+      model-name: gpt-5.4-nano
+      log-requests: true
+      log-responses: true
+      max-tokens: 8192
   memory:
     max-messages: 20
     redis-key-prefix: "lc4j:chat_memory:"
     ttl-seconds: 604800 # 7天
-#cos:
+cos:
   client:
-    host: "<your cos host>"
-    secretId: "<your secret id>"
-    secretKey: "<your secret key>"
-    region: "<your region>"
-    bucket: "<your bucket>"
+    host: ""
+    secretId: ""
+    secretKey: ""
+    region: "ap-shanghai"
+    bucket: ""
 # Selenium WebDriver 池配置
 webdriver:
   pool:
@@ -87,12 +79,12 @@ webdriver:
     width: 1920
     height: 1080
 pexels:
-  api-key: <Your Pexels API Key>
+  api-key: ""
 dashscope:
-  api-key: <Your API Key>
+  api-key: ""
   model-name: "wanx2.0-t2i-turbo"
 app:
   codegen:
     agent:
-      enabled: false
+      enabled: true
       fallback-to-legacy: true
