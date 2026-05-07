@@ -106,10 +106,8 @@ public class AiCodegenServiceFaced {
      * 中获取 reasoning_content，不依赖标签是否完整，更可靠。
      */
     private Flux<String> generateVueProjectStream(String userMessage, Long appId) {
-        VueProjectCodegenService service = vueProjectCodegenServiceFactory.getService();
-
-        // Sinks.Many 作为 Flux 的发布者，LATEST 背压策略适合 SSE 场景
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
+        VueProjectCodegenService service = vueProjectCodegenServiceFactory.getService(sink);
 
         service.generateVueProjectStream(userMessage, appId)
                 .onPartialThinking(partialThinking -> {

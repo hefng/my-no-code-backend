@@ -1,5 +1,6 @@
 package com.hefng.mynocodebackend.ai.factory;
 
+import com.hefng.mynocodebackend.ai.guardrail.PromptSafetyInputGuardrail;
 import com.hefng.mynocodebackend.ai.service.AiCodegenService;
 import com.hefng.mynocodebackend.service.ChatHistoryService;
 import dev.langchain4j.community.store.ememory.chat.redis.RedisChatMemoryStore;
@@ -37,6 +38,7 @@ public class AiCodeGeneratorServiceFactory {
         // 加载历史对话到内存
         chatHistoryService.loadChatHistoryToMemory(appId, memory, 20);
         return AiServices.builder(AiCodegenService.class)
+                .inputGuardrails(new PromptSafetyInputGuardrail()) // 输入安全防护，过滤敏感词等
                 .chatMemory(memory)
                 .chatModel(simpleChatModel)
                 .streamingChatModel(reasoningStreamingChatModel)

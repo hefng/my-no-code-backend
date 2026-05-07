@@ -1,16 +1,22 @@
 package com.hefng.mynocodebackend.ai.factory;
 
+import com.hefng.mynocodebackend.ai.guardrail.PromptSafetyInputGuardrail;
 import com.hefng.mynocodebackend.ai.service.VueProjectCodegenService;
 import com.hefng.mynocodebackend.ai.tool.*;
+import com.hefng.mynocodebackend.model.dto.sse.ToolStreamEvent;
+import com.hefng.mynocodebackend.model.enums.SseEventTypeEnum;
 import com.hefng.mynocodebackend.service.ChatHistoryService;
+import com.hefng.mynocodebackend.utils.SseEventBuilder;
 import dev.langchain4j.community.store.ememory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.tool.ToolExecution;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Sinks;
 
 /**
  * Vue 工程化项目代码生成服务工厂
@@ -46,7 +52,7 @@ public class VueProjectCodegenServiceFactory {
      *
      * @return 配置好的 VueProjectCodegenService 实例
      */
-    public VueProjectCodegenService getService() {
+    public VueProjectCodegenService getService(Sinks.Many<String> sink) {
         return AiServices.builder(VueProjectCodegenService.class)
                 .streamingChatModel(reasoningStreamingChatModel)
                 .chatMemoryProvider(memoryId -> {
@@ -55,12 +61,18 @@ public class VueProjectCodegenServiceFactory {
                             .chatMemoryStore(redisChatMemoryStore)
                             .maxMessages(50)
                             .build();
-                    // 加载历史对话到内存，保证多轮对话上下文连贯
                     chatHistoryService.loadChatHistoryToMemory((Long) memoryId, memory, 20);
                     return memory;
                 })
-                // 注册所有工具，AI 可按需调用：保存、编辑、读取、删除文件，以及读取目录结构
+                .inputGuardrails(new PromptSafetyInputGuardrail()) // 输入安全防护，过滤敏感词等
                 .tools(toolManager.getAllTools())
+                .beforeToolExecution(before -> sink.tryEmitNext(SseEventBuilder.build(SseEventTypeEnum.TOOL,
+                        new ToolStreamEvent("executing", before.request().id(),
+                                before.request().name(), null,
+                                before.request().arguments(), null))))
+                .afterToolExecution(after -> sink.tryEmitNext(SseEventBuilder.build(SseEventTypeEnum.TOOL,
+                        new ToolStreamEvent("completed", after.request().id(),
+                                after.request().name(), null, null, after.result()))))
                 .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                         toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                 ))
