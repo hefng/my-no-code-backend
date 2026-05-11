@@ -6,6 +6,8 @@ target/
 !**/src/test/**/target/
 .codex
 .kiro
+.agents
+.claude
 
 ### STS ###
 .apt_generated
@@ -36,3 +38,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local Workspace Files ###
+AGENTS.md
+mvn-test.log
+my-no-code-frontend/.env
+my-no-code-frontend/.env.production
+my-no-code-frontend/.impeccable.md
