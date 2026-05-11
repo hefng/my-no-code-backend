@@ -4,6 +4,7 @@ import cn.hutool.core.lang.TypeReference;
 import com.hefng.mynocodebackend.ai.service.AiCodeGenTypeRoutingService;
 import com.hefng.mynocodebackend.ai.model.CodegenTypeEnum;
 import com.hefng.mynocodebackend.annotation.AuthCheck;
+import com.hefng.mynocodebackend.annotation.RateLimit;
 import com.hefng.mynocodebackend.common.BaseResponse;
 import com.hefng.mynocodebackend.common.DeleteRequest;
 import com.hefng.mynocodebackend.common.ErrorCode;
@@ -77,6 +78,7 @@ public class AppController {
      * @return SSE 事件流
      */
     @GetMapping(value = "chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RateLimit(keyPrefix = "rate_limit:chatToGenCode", time = 1, unit = TimeUnit.MINUTES, count = 5)
     public Flux<ServerSentEvent<String>> chatToGenCode(ChatToGenCodeRequest chatToGenCodeRequest,
                                                         HttpServletRequest request) {
         ThrowUtils.throwIf(chatToGenCodeRequest == null, ErrorCode.PARAMS_ERROR, "请求参数不能为空");
