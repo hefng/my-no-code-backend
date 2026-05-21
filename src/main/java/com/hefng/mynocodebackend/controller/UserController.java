@@ -1,5 +1,7 @@
 package com.hefng.mynocodebackend.controller;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.IdUtil;
 import com.hefng.mynocodebackend.annotation.AuthCheck;
 import com.hefng.mynocodebackend.common.BaseResponse;
 import com.hefng.mynocodebackend.common.DeleteRequest;
@@ -8,6 +10,8 @@ import com.hefng.mynocodebackend.common.ResultUtils;
 import com.hefng.mynocodebackend.constant.UserConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
 import com.hefng.mynocodebackend.exception.ThrowUtils;
+import com.hefng.mynocodebackend.config.CosClientConfig;
+import com.hefng.mynocodebackend.manager.CosManager;
 import com.hefng.mynocodebackend.model.dto.user.*;
 import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.vo.LoginUserVO;
@@ -21,6 +25,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.io.IOException;
 
 import java.util.List;
 
@@ -39,6 +47,12 @@ public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private CosManager cosManager;
+
+    @Resource
+    private CosClientConfig cosClientConfig;
 
     // region 登录相关
 
@@ -267,11 +281,51 @@ public class UserController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        User user = new User();
-        BeanUtils.copyProperties(userUpdateMyRequest, user);
-        user.setId(loginUser.getId());
-        boolean result = userService.updateById(user);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        return ResultUtils.success(true);
+        boolean result = userService.updateMyUser(loginUser, userUpdateMyRequest);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 上传头像到 COS
+     *
+     * @param file    图片文件
+     * @param request 当前请求
+     * @return 图片访问地址
+     */
+    @PostMapping("/avatar/upload")
+    public BaseResponse<String> uploadAvatar(@RequestPart("file") MultipartFile file, HttpServletRequest request) {
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "文件不能为空");
+
+        String contentType = file.getContentType();
+        ThrowUtils.throwIf(StringUtils.isBlank(contentType) || !StringUtils.startsWith(contentType, "image/"),
+                ErrorCode.PARAMS_ERROR, "只允许上传图片");
+
+        User loginUser = userService.getLoginUser(request);
+        String originalFilename = file.getOriginalFilename();
+        String extension = FileUtil.extName(originalFilename);
+        if (StringUtils.isBlank(extension) || extension.length() > 10) {
+            extension = "png";
+        }
+        extension = extension.toLowerCase();
+
+        File tempFile = null;
+        try {
+            // 先落到本地临时文件，再复用项目里现有的 COS 上传方式。
+            tempFile = File.createTempFile("avatar-", "." + extension);
+            file.transferTo(tempFile);
+
+            String cosKey = "avatars/" + loginUser.getId() + "/" + IdUtil.simpleUUID() + "." + extension;
+            ThrowUtils.throwIf(cosManager.putPictureObject(cosKey, tempFile) == null,
+                    ErrorCode.OPERATION_ERROR, "头像上传失败");
+
+            String avatarUrl = cosClientConfig.getHost() + "/" + cosKey;
+            return ResultUtils.success(avatarUrl);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "头像上传失败：" + e.getMessage());
+        } finally {
+            if (tempFile != null) {
+                FileUtil.del(tempFile);
+            }
+        }
     }
 }

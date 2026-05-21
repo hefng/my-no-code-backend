@@ -2,6 +2,7 @@ package com.hefng.mynocodebackend.service;
 
 
 import com.hefng.mynocodebackend.model.dto.user.UserQueryRequest;
+import com.hefng.mynocodebackend.model.dto.user.UserUpdateMyRequest;
 import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.vo.LoginUserVO;
 import com.hefng.mynocodebackend.model.vo.UserVO;
@@ -78,6 +79,15 @@ public interface UserService extends IService<User> {
      * @return
      */
     boolean userLogout(HttpServletRequest request);
+
+    /**
+     * 更新当前登录用户的个人信息
+     *
+     * @param loginUser           当前登录用户
+     * @param userUpdateMyRequest 更新请求
+     * @return 是否更新成功
+     */
+    boolean updateMyUser(User loginUser, UserUpdateMyRequest userUpdateMyRequest);
 
     /**
      * 获取脱敏的已登录用户信息

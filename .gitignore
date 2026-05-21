@@ -8,6 +8,7 @@ target/
 .kiro
 .agents
 .claude
+.impeccable.md
 
 ### STS ###
 .apt_generated

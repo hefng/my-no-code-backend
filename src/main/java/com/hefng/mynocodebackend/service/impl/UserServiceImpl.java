@@ -4,6 +4,8 @@ import cn.hutool.core.collection.CollUtil;
 import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.constant.CommonConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
+import com.hefng.mynocodebackend.exception.ThrowUtils;
+import com.hefng.mynocodebackend.model.dto.user.UserUpdateMyRequest;
 import com.hefng.mynocodebackend.model.dto.user.UserQueryRequest;
 import com.hefng.mynocodebackend.model.enums.UserRoleEnum;
 import com.hefng.mynocodebackend.model.vo.LoginUserVO;
@@ -181,6 +183,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         }
         // 移除登录态
         request.getSession().removeAttribute(USER_LOGIN_STATE);
+        return true;
+    }
+
+    @Override
+    public boolean updateMyUser(User loginUser, UserUpdateMyRequest userUpdateMyRequest) {
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
+        ThrowUtils.throwIf(userUpdateMyRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");
+
+        User user = new User();
+        user.setId(loginUser.getId());
+        // 个人信息允许改昵称、头像和简介，但账号必须保持不变。
+        user.setUserAccount(loginUser.getUserAccount());
+        user.setUsername(userUpdateMyRequest.getUsername());
+        user.setUserAvatar(userUpdateMyRequest.getUserAvatar());
+        user.setUserProfile(userUpdateMyRequest.getUserProfile());
+
+        boolean result = this.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "更新个人信息失败");
         return true;
     }
 
