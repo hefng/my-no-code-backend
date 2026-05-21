@@ -9,7 +9,11 @@
     <a-layout-content class="content">
       <div class="content-inner">
         <RouterView v-slot="{ Component }">
-          <component :is="Component" class="route-page" />
+          <component
+            :is="Component"
+            class="route-page"
+            :class="{ 'route-page--scrollable': isPageScrollable }"
+          />
         </RouterView>
       </div>
     </a-layout-content>
@@ -17,8 +21,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterView } from 'vue-router'
+import { useRoute } from 'vue-router'
 import GlobalHeader from '@/components/GlobalHeader.vue'
+
+const route = useRoute()
+
+const isPageScrollable = computed(() => {
+  // 聊天页依赖自身的分栏滚动区域，其余页面默认由布局层承接纵向滚动。
+  return route.meta.layoutScrollable !== false
+})
 </script>
 
 <style scoped>
@@ -40,17 +53,17 @@ import GlobalHeader from '@/components/GlobalHeader.vue'
   background-image:
     radial-gradient(
       circle at 18% 24%,
-      color-mix(in oklch, var(--auth-bg-secondary) 28%, transparent) 0%,
+      color-mix(in oklch, var(--auth-bg-secondary) 18%, transparent) 0%,
       transparent 46%
     ),
     radial-gradient(
       circle at 82% 12%,
-      color-mix(in oklch, var(--auth-accent-soft) 36%, transparent) 0%,
+      color-mix(in oklch, var(--auth-accent-soft) 20%, transparent) 0%,
       transparent 34%
     ),
     radial-gradient(
       circle at 72% 72%,
-      color-mix(in oklch, var(--auth-accent) 12%, transparent) 0%,
+      color-mix(in oklch, var(--auth-accent) 7%, transparent) 0%,
       transparent 42%
     );
   pointer-events: none;
@@ -91,6 +104,12 @@ import GlobalHeader from '@/components/GlobalHeader.vue'
   flex: 1;
   min-height: 0;
   min-width: 0;
+}
+
+.route-page--scrollable {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* 响应式布局 */
