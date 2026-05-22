@@ -18,6 +18,7 @@ import com.hefng.mynocodebackend.langgraph4j.enums.WorkflowOperationTypeEnum;
 import com.hefng.mynocodebackend.manager.CosManager;
 import com.hefng.mynocodebackend.mapper.AppMapper;
 import com.hefng.mynocodebackend.model.dto.app.AppQueryRequest;
+import com.hefng.mynocodebackend.model.dto.sse.ToolStreamEvent;
 import com.hefng.mynocodebackend.model.entity.App;
 import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.model.enums.ChatMessageTypeEnum;
@@ -361,6 +362,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             if (SseEventTypeEnum.DONE.getValue().equals(event)) {
                 return;
             }
+            if (SseEventTypeEnum.TOOL.getValue().equals(event)) {
+                appendCompactToolResponse(aiResponseBuilder, json);
+                return;
+            }
             if (SseEventTypeEnum.WORKFLOW_STEP.getValue().equals(event)) {
                 cn.hutool.json.JSONObject stepPayload = json.getJSONObject("d");
                 if (stepPayload != null) {
@@ -390,6 +395,57 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         } catch (Exception ignored) {
             aiResponseBuilder.append(chunk);
         }
+    }
+
+    private void appendCompactToolResponse(StringBuilder aiResponseBuilder, cn.hutool.json.JSONObject json) {
+        cn.hutool.json.JSONObject toolJson = json.getJSONObject("d");
+        if (toolJson == null) {
+            String rawToolJson = json.getStr("d", "");
+            if (StringUtils.isBlank(rawToolJson)) {
+                return;
+            }
+            try {
+                toolJson = cn.hutool.json.JSONUtil.parseObj(rawToolJson);
+            } catch (Exception e) {
+                log.warn("解析工具事件失败，chunk={}", json, e);
+                return;
+            }
+        }
+
+        ToolStreamEvent toolStreamEvent = toolJson.toBean(ToolStreamEvent.class);
+        if (toolStreamEvent == null) {
+            return;
+        }
+
+        cn.hutool.json.JSONObject compact = new cn.hutool.json.JSONObject();
+        compact.put("phase", toolStreamEvent.getPhase());
+        compact.put("toolCallId", toolStreamEvent.getToolCallId());
+        compact.put("toolName", toolStreamEvent.getToolName());
+        compact.put("message", compactToolMessage(toolStreamEvent.getMessage()));
+        aiResponseBuilder.append(cn.hutool.json.JSONUtil.toJsonStr(compact));
+    }
+
+    private String compactToolMessage(String message) {
+        if (StringUtils.isBlank(message)) {
+            return "";
+        }
+
+        List<String> meaningfulLines = new ArrayList<>();
+        for (String line : message.split("\\R")) {
+            String trimmed = StringUtils.trimToEmpty(line);
+            if (StringUtils.isBlank(trimmed) || trimmed.startsWith("```")) {
+                continue;
+            }
+            meaningfulLines.add(trimmed);
+            if (meaningfulLines.size() >= 2) {
+                break;
+            }
+        }
+
+        String summary = meaningfulLines.isEmpty()
+                ? StringUtils.normalizeSpace(message)
+                : String.join(" ", meaningfulLines);
+        return StringUtils.abbreviate(summary, 160);
     }
 
     private void persistAiResponse(Long appId, Long userId, String aiResponse, String traceId) {

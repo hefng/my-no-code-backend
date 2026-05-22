@@ -139,11 +139,8 @@ public class CodeGenWorkflowWithFlux {
                                                 WorkflowOperationTypeEnum operationType,
                                                 CodegenTypeEnum generationType) {
         return Flux.<String>create(sink -> Thread.startVirtualThread(() -> {
-            Consumer<String> buildProgressCallback = line -> {
-                if (!sink.isCancelled()) {
-                    sink.next(SseEventBuilder.build(SseEventTypeEnum.BUILD_LOG, line));
-                }
-            };
+            // 构建日志只保留在后端日志里，不再推给前端，避免把 npm/vite 噪声塞进对话内容。
+            Consumer<String> buildProgressCallback = line -> log.debug("[BUILD] {}", line);
             CompiledGraph<MessagesState<String>> workflow = createWorkflow(buildProgressCallback);
             WorkflowContext initialContext = WorkflowContext.builder()
                     .appId(appId)
