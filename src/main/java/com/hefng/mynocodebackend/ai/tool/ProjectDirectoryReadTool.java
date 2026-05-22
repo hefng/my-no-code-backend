@@ -105,6 +105,10 @@ public class ProjectDirectoryReadTool extends BaseProjectTool {
         if (StrUtil.isEmpty(relativeDirPath)) {
             relativeDirPath = "根目录";
         }
+        String toolResult = arguments.getStr("toolResult");
+        if (StrUtil.isNotBlank(toolResult)) {
+            return String.format("[目录读取] %s\n```text\n%s\n```", relativeDirPath, toolResult);
+        }
         return String.format("[工具调用] %s %s", getToolDescription(), relativeDirPath);
     }
 }

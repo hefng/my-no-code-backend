@@ -95,6 +95,10 @@ public class ProjectFileEditTool extends BaseProjectTool {
         String relativePath = arguments.getStr("relativePath");
         String oldContent = arguments.getStr("oldContent");
         String newContent = arguments.getStr("newContent");
+        String toolResult = arguments.getStr("toolResult");
+        if (StrUtil.isNotBlank(toolResult)) {
+            return String.format("[文件编辑] %s\n%s", relativePath, toolResult);
+        }
         return String.format("""
                     [文件编辑] %s
                     编辑前:

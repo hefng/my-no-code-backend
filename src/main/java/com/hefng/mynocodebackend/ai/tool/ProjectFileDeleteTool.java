@@ -77,6 +77,10 @@ public class ProjectFileDeleteTool extends BaseProjectTool {
     @Override
     public String generateToolExecutedResult(JSONObject arguments) {
         String relativePath = arguments.getStr("relativePath");
+        String toolResult = arguments.getStr("toolResult");
+        if (StrUtil.isNotBlank(toolResult)) {
+            return String.format("[文件删除] %s\n%s", relativePath, toolResult);
+        }
         return String.format("[文件删除] %s", relativePath);
     }
 }

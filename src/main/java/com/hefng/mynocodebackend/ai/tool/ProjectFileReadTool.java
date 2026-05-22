@@ -79,7 +79,10 @@ public class ProjectFileReadTool extends BaseProjectTool {
     public String generateToolExecutedResult(JSONObject arguments) {
         String relativePath = arguments.getStr("relativePath");
         String suffix = FileUtil.getSuffix(relativePath);
-        String content = arguments.getStr("content");
+        String content = arguments.getStr("toolResult");
+        if (StrUtil.isBlank(content)) {
+            content = arguments.getStr("content");
+        }
         return String.format("[文件读取] %s\n```%s\n%s\n```", relativePath, suffix, content);
     }
 }

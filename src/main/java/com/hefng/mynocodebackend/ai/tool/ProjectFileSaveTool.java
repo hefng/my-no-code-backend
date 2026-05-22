@@ -80,9 +80,16 @@ public class ProjectFileSaveTool extends BaseProjectTool {
     @Override
     public String generateToolExecutedResult(JSONObject arguments) {
         String resolvedPath = arguments.getStr("resolvedPath");
+        if (StrUtil.isBlank(resolvedPath)) {
+            resolvedPath = arguments.getStr("relativePath");
+        }
         String content = arguments.getStr("content");
+        String toolResult = arguments.getStr("toolResult");
         // 文件扩展名
         String suffix = FileUtil.getSuffix(resolvedPath);
+        if (StrUtil.isNotBlank(toolResult)) {
+            return String.format("[文件保存] %s\n%s", resolvedPath, toolResult);
+        }
         return String.format("""
                     [文件保存] %s
                     ```%s
