@@ -1,6 +1,7 @@
 package com.hefng.mynocodebackend.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.RandomUtil;
 import com.hefng.mynocodebackend.common.ErrorCode;
 import com.hefng.mynocodebackend.constant.CommonConstant;
 import com.hefng.mynocodebackend.exception.BusinessException;
@@ -93,6 +94,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
             User user = new User();
             user.setUserAccount(userAccount);
             user.setUserPassword(encryptPassword);
+            user.setUsername("eb_" + RandomUtil.randomString(8));
             boolean saveResult = this.save(user);
             if (!saveResult) {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
