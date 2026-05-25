@@ -1,10 +1,10 @@
 <script lang="ts" setup>
-import { GithubOutlined } from '@ant-design/icons-vue'
-import { userLogin, userRegister } from '@/api/userController'
+import { GithubOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { getCaptcha, userLogin, userRegister } from '@/api/userController'
 import router from '@/router'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 
 const route = useRoute()
 
@@ -21,6 +21,29 @@ const registerFormState = reactive<API.UserRegisterRequest>({
 
 const loading = ref(false)
 const isRegisterMode = ref(false)
+
+const captchaImg = ref('')
+const captchaKey = ref('')
+const captchaCaptchaLoading = ref(false)
+
+const fetchCaptcha = async () => {
+  captchaCaptchaLoading.value = true
+  try {
+    const { data } = await getCaptcha()
+    if (data.code === 20000 && data.data) {
+      captchaImg.value = data.data.captchaImg || ''
+      captchaKey.value = data.data.captchaKey || ''
+    }
+  } finally {
+    captchaCaptchaLoading.value = false
+  }
+}
+
+watch(isRegisterMode, (val) => {
+  if (val) {
+    fetchCaptcha()
+  }
+})
 
 const toggleMode = () => {
   isRegisterMode.value = !isRegisterMode.value
@@ -46,11 +69,15 @@ const handleLogin = async (values: API.UserLoginRequest) => {
 const handleRegister = async (values: API.UserRegisterRequest) => {
   loading.value = true
   try {
+    values.captchaKey = captchaKey.value
     const { data } = await userRegister(values)
     if (data.code === 20000 && data.data) {
       message.success('注册成功，请登录')
       isRegisterMode.value = false
       return
+    }
+    if (data.code === 40001) {
+      fetchCaptcha()
     }
     message.error(`注册失败: ${data.message}`)
   } catch (error) {
@@ -237,6 +264,31 @@ onMounted(() => {
                 autocomplete="new-password"
               />
             </a-form-item>
+            <a-form-item
+              name="captchaCode"
+              :rules="[{ required: true, message: '请输入验证码' }]"
+            >
+              <div class="captcha-row">
+                <a-input
+                  v-model:value="registerFormState.captchaCode"
+                  placeholder="验证码"
+                  size="large"
+                  :maxlength="4"
+                  autocomplete="off"
+                />
+                <div class="captcha-img-wrap" @click="fetchCaptcha">
+                  <img
+                    v-if="captchaImg"
+                    :src="captchaImg"
+                    alt="验证码"
+                    class="captcha-img"
+                  />
+                  <div class="captcha-img-placeholder" v-else>
+                    <ReloadOutlined :spin="captchaCaptchaLoading" />
+                  </div>
+                </div>
+              </div>
+            </a-form-item>
             <a-form-item class="oauth-section">
               <div class="oauth-divider">
                 <span class="oauth-divider-text">或</span>
@@ -296,7 +348,7 @@ onMounted(() => {
       transparent 32%
     ),
     linear-gradient(155deg, var(--auth-bg-main) 0%, oklch(0.95 0.02 78) 100%);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .grain-layer {
@@ -602,6 +654,49 @@ onMounted(() => {
   outline: 2px solid var(--auth-focus);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+.captcha-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.captcha-img-wrap {
+  flex-shrink: 0;
+  width: 120px;
+  height: 48px;
+  border: 1px solid var(--auth-line);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: oklch(0.99 0.008 65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 200ms ease;
+}
+
+.captcha-img-wrap:hover {
+  border-color: color-mix(in oklch, var(--auth-line) 58%, var(--auth-accent));
+}
+
+.captcha-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.captcha-img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--auth-text-soft);
+  font-size: 1.1rem;
+}
+
+.captcha-row :deep(.ant-input) {
+  flex: 1;
 }
 
 @media (max-width: 940px) {

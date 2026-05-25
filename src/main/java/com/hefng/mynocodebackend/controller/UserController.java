@@ -1,5 +1,7 @@
 package com.hefng.mynocodebackend.controller;
 
+import cn.hutool.captcha.CaptchaUtil;
+import cn.hutool.captcha.LineCaptcha;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import com.hefng.mynocodebackend.annotation.AuthCheck;
@@ -23,14 +25,17 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static com.hefng.mynocodebackend.service.impl.UserServiceImpl.SALT;
 
@@ -54,7 +59,29 @@ public class UserController {
     @Resource
     private CosClientConfig cosClientConfig;
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    private static final String CAPTCHA_REDIS_PREFIX = "captcha:";
+
     // region 登录相关
+
+    /**
+     * 获取图形验证码
+     *
+     * @return captchaKey + base64 captchaImg
+     */
+    @GetMapping("/captcha")
+    public BaseResponse<Map<String, String>> getCaptcha() {
+        LineCaptcha lineCaptcha = CaptchaUtil.createLineCaptcha(200, 80, 4, 20);
+        String captchaKey = IdUtil.simpleUUID();
+        String captchaCode = lineCaptcha.getCode();
+        stringRedisTemplate.opsForValue().set(CAPTCHA_REDIS_PREFIX + captchaKey, captchaCode, 5, TimeUnit.MINUTES);
+        Map<String, String> result = new HashMap<>();
+        result.put("captchaKey", captchaKey);
+        result.put("captchaImg", lineCaptcha.getImageBase64Data());
+        return ResultUtils.success(result);
+    }
 
     /**
      * 用户注册
@@ -70,10 +97,12 @@ public class UserController {
         String userAccount = userRegisterRequest.getUserAccount();
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
+        String captchaKey = userRegisterRequest.getCaptchaKey();
+        String captchaCode = userRegisterRequest.getCaptchaCode();
+        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, captchaKey, captchaCode)) {
             return null;
         }
-        long result = userService.userRegister(userAccount, userPassword, checkPassword);
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, captchaKey, captchaCode);
         return ResultUtils.success(result);
     }
 

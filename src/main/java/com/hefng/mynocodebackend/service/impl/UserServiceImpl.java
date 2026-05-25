@@ -16,15 +16,18 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.mapper.UserMapper;
 import com.hefng.mynocodebackend.service.UserService;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.hefng.mynocodebackend.constant.UserConstant.USER_LOGIN_STATE;
@@ -44,10 +47,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
      */
     public static final String SALT = "yupi";
 
+    private static final String CAPTCHA_REDIS_PREFIX = "captcha:";
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword) {
+    public long userRegister(String userAccount, String userPassword, String checkPassword, String captchaKey, String captchaCode) {
         // 1. 校验
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
+        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, captchaKey, captchaCode)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
         }
         if (userAccount.length() < 4) {
@@ -60,6 +68,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         if (!userPassword.equals(checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入的密码不一致");
         }
+        // 验证码校验
+        String redisKey = CAPTCHA_REDIS_PREFIX + captchaKey;
+        String captchaAnswer = stringRedisTemplate.opsForValue().get(redisKey);
+        if (captchaAnswer == null) {
+            throw new BusinessException(ErrorCode.CAPTCHA_ERROR, "验证码已过期，请刷新后重试");
+        }
+        if (!captchaAnswer.equalsIgnoreCase(captchaCode)) {
+            throw new BusinessException(ErrorCode.CAPTCHA_ERROR, "验证码输入错误");
+        }
+        // 校验通过后删除，防止重复使用
+        stringRedisTemplate.delete(redisKey);
         synchronized (userAccount.intern()) {
             // 账户不能重复
             QueryWrapper queryWrapper = new QueryWrapper();
