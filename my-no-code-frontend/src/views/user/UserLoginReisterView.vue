@@ -1,8 +1,12 @@
 <script lang="ts" setup>
+import { GithubOutlined } from '@ant-design/icons-vue'
 import { userLogin, userRegister } from '@/api/userController'
 import router from '@/router'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+
+const route = useRoute()
 
 const loginFormState = reactive<API.UserLoginRequest>({
   userAccount: '',
@@ -56,6 +60,22 @@ const handleRegister = async (values: API.UserRegisterRequest) => {
     loading.value = false
   }
 }
+
+const githubLoading = ref(false)
+
+const handleGithubLogin = () => {
+  githubLoading.value = true
+  const baseUrl = import.meta.env.VITE_API_BASE_URL
+  window.location.href = `${baseUrl}/user/oauth/github/authorize`
+}
+
+onMounted(() => {
+  const errorMsg = route.query.error
+  if (errorMsg && typeof errorMsg === 'string') {
+    message.error(`GitHub 登录失败: ${decodeURIComponent(errorMsg)}`)
+    router.replace({ query: {} })
+  }
+})
 </script>
 
 <template>
@@ -138,6 +158,20 @@ const handleRegister = async (values: API.UserRegisterRequest) => {
                 autocomplete="current-password"
               />
             </a-form-item>
+            <a-form-item class="oauth-section">
+              <div class="oauth-divider">
+                <span class="oauth-divider-text">或</span>
+              </div>
+              <a-button
+                class="github-login-btn"
+                size="large"
+                block
+                :loading="githubLoading"
+                @click="handleGithubLogin"
+              >
+                <template #icon><GithubOutlined /></template>
+              </a-button>
+            </a-form-item>
             <a-form-item>
               <a-button
                 type="primary"
@@ -202,6 +236,20 @@ const handleRegister = async (values: API.UserRegisterRequest) => {
                 size="large"
                 autocomplete="new-password"
               />
+            </a-form-item>
+            <a-form-item class="oauth-section">
+              <div class="oauth-divider">
+                <span class="oauth-divider-text">或</span>
+              </div>
+              <a-button
+                class="github-login-btn"
+                size="large"
+                block
+                :loading="githubLoading"
+                @click="handleGithubLogin"
+              >
+                <template #icon><GithubOutlined /></template>
+              </a-button>
             </a-form-item>
             <a-form-item>
               <a-button
@@ -476,6 +524,60 @@ const handleRegister = async (values: API.UserRegisterRequest) => {
 }
 
 .submit-button:active {
+  transform: translateY(0);
+}
+
+.oauth-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.oauth-section :deep(.ant-form-item-control-input-content) {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--auth-line);
+}
+
+.oauth-divider-text {
+  margin: 0 var(--space-3);
+  color: var(--auth-text-soft);
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.github-login-btn {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklch, var(--auth-line) 78%, transparent);
+  background: oklch(0.14 0.02 260);
+  color: oklch(0.96 0.01 260);
+  font-size: 1.3rem;
+  transition: background-color 200ms ease, transform 200ms ease;
+}
+
+.github-login-btn:hover,
+.github-login-btn:focus-visible {
+  background: oklch(0.18 0.02 260) !important;
+  color: oklch(0.99 0.01 260) !important;
+  border-color: oklch(0.18 0.02 260) !important;
+  transform: translateY(-1px);
+}
+
+.github-login-btn:active {
   transform: translateY(0);
 }
 

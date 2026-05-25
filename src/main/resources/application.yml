@@ -85,6 +85,12 @@ pexels:
 dashscope:
   api-key: ""
   model-name: "wanx2.0-t2i-turbo"
+github:
+  oauth:
+    client-id: ""
+    client-secret: ""
+    redirect-uri: "http://localhost:8123/api/user/oauth/github/callback"
+    frontend-base-url: "http://localhost:5173"
 app:
   codegen:
     agent:

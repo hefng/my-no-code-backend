@@ -187,6 +187,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
     }
 
     @Override
+    public User getByGithubId(Long githubId) {
+        if (githubId == null) {
+            return null;
+        }
+        QueryWrapper queryWrapper = new QueryWrapper();
+        queryWrapper.eq("githubId", githubId);
+        return this.getOne(queryWrapper);
+    }
+
+    @Override
     public boolean updateMyUser(User loginUser, UserUpdateMyRequest userUpdateMyRequest) {
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
         ThrowUtils.throwIf(userUpdateMyRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");

@@ -62,3 +62,8 @@ create table if not exists chat_history
 -- 应用表添加 isAgent 字段
 alter table app
     add column isAgent tinyint default 0 not null comment '是否是agent模式生成的应用' after codegenType;
+
+-- GitHub OAuth 登录功能迁移
+-- 在 user 表添加 githubId 字段用于关联 GitHub 账号
+ALTER TABLE `user` ADD COLUMN `githubId` BIGINT NULL COMMENT 'GitHub 用户 ID' AFTER `userProfile`;
+CREATE UNIQUE INDEX `idx_githubId` ON `user` (`githubId`);

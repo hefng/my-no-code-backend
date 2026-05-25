@@ -113,6 +113,14 @@ public interface UserService extends IService<User> {
     List<UserVO> getUserVO(List<User> userList);
 
     /**
+     * 根据 githubId 查找用户
+     *
+     * @param githubId GitHub 用户 ID
+     * @return 用户实体，未找到返回 null
+     */
+    User getByGithubId(Long githubId);
+
+    /**
      * 获取查询条件
      *
      * @param userQueryRequest

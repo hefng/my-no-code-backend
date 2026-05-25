@@ -62,6 +62,12 @@ public class User implements Serializable {
     private String userProfile;
 
     /**
+     * GitHub 用户 ID（用于 OAuth 登录关联）
+     */
+    @Column("githubId")
+    private Long githubId;
+
+    /**
      * 用户角色：user/admin/ban
      */
     @Column("userRole")
