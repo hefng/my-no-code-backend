@@ -127,7 +127,6 @@ public class VueProjectBuilder {
      * 格式：{CODEGEN_DIR}/vue_project_{appId}
      */
     private String buildProjectDir(Long appId) {
-        return AppConstant.CODEGEN_DIR + File.separator
-                + CodegenTypeEnum.VUE_PROJECT.getType() + "_" + appId;
+        return AppConstant.CODEGEN_DIR + CodegenTypeEnum.VUE_PROJECT.getType() + "_" + appId;
     }
 }

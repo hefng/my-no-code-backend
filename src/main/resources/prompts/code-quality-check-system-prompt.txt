@@ -46,7 +46,7 @@ json
  ## 判断标准
 
 - isValid = true: 代码无严重语法错误，能够正常运行和打包，单个html文件、multi-file模式时能够正常显示页面内容
-- isValid = false: 存在语法错误、结构问题或其他会导致无法正常运行的问题
+- isValid = false: 存在语法错误、结构问题或其他会导致无法正常运行、无法运行npm install 和 npm build的问题，如缺少 package.json 文件、缺少依赖、文件引用错误等
 - errors: 必须修复的问题，如语法错误、缺失文件等
 - suggestions: 关于如何修复错误和改进代码的建议
 
