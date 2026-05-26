@@ -86,7 +86,7 @@ public class ChatHistoryController {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不合法");
         User loginUser = userService.getLoginUser(request);
 
-        // 校验权限：仅应用创建者或管理员可查看
+        // 校验权限：应用创建者、管理员，或精选应用的普通查看者都可以查看
         checkChatHistoryPermission(appId, loginUser);
 
         List<ChatHistoryVO> list = chatHistoryService.listLatestChatHistory(appId, loginUser);
@@ -158,7 +158,14 @@ public class ChatHistoryController {
         // 校验应用是否存在，且当前用户是否为应用创建者
         com.hefng.mynocodebackend.model.entity.App app = appService.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
-        ThrowUtils.throwIf(!app.getAppOwnerId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限查看该应用的对话历史");
+        if (app.getAppOwnerId().equals(loginUser.getId())) {
+            return;
+        }
+        // 精选应用开放给普通用户查看对话历史
+        if (app.getPriority() != null && app.getPriority() == com.hefng.mynocodebackend.constant.AppConstant.MAX_PRIORITY) {
+            return;
+        }
+        ThrowUtils.throwIf(true, ErrorCode.NO_AUTH_ERROR, "无权查看当前应用");
     }
 
     // endregion

@@ -236,7 +236,8 @@ public class AppController {
      * @return
      */
     @PostMapping("/get/vo")
-    public BaseResponse<AppVO> getAppVOById(@RequestBody AppQueryRequest appQueryRequest) {
+    public BaseResponse<AppVO> getAppVOById(@RequestBody AppQueryRequest appQueryRequest,
+                                             HttpServletRequest request) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         Long id = appQueryRequest.getId();
         if (id <= 0) {
@@ -245,6 +246,14 @@ public class AppController {
         
         App app = appService.getById(id);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+
+        // 普通用户只能查看精选应用（priority=99）；自己的应用和管理员单独放行
+        User loginUser = userService.getLoginUser(request);
+        if (!userService.isAdmin(loginUser)
+                && !app.getAppOwnerId().equals(loginUser.getId())
+                && (app.getPriority() == null || app.getPriority() != AppConstant.MAX_PRIORITY)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权查看当前应用");
+        }
         
         return ResultUtils.success(appService.getAppVO(app));
     }

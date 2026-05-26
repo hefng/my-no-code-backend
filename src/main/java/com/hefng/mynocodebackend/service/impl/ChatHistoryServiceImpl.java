@@ -109,7 +109,6 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         // 按 createTime 降序取最新 10 条，再反转为升序返回给前端
         QueryWrapper queryWrapper = QueryWrapper.create()
                 .where(CHAT_HISTORY.APP_ID.eq(appId))
-                .and(CHAT_HISTORY.USER_ID.eq(loginUser.getId()))
                 .orderBy(CHAT_HISTORY.CREATE_TIME.desc())
                 .limit(10);
 
