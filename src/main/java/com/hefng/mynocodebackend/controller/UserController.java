@@ -99,10 +99,13 @@ public class UserController {
         String checkPassword = userRegisterRequest.getCheckPassword();
         String captchaKey = userRegisterRequest.getCaptchaKey();
         String captchaCode = userRegisterRequest.getCaptchaCode();
+        // 设置用户默认头像
+        String cosKey = "avatars/default_avatar.jpg";
+        String userAvatar = cosClientConfig.getHost() + "/" + cosKey;
         if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, captchaKey, captchaCode)) {
             return null;
         }
-        long result = userService.userRegister(userAccount, userPassword, checkPassword, captchaKey, captchaCode);
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, captchaKey, captchaCode, userAvatar);
         return ResultUtils.success(result);
     }
 

@@ -54,7 +54,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
     private StringRedisTemplate stringRedisTemplate;
 
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword, String captchaKey, String captchaCode) {
+    public long userRegister(String userAccount, String userPassword, String checkPassword, String captchaKey, String captchaCode, String userAvatar) {
         // 1. 校验
         if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, captchaKey, captchaCode)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
@@ -95,6 +95,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
             user.setUserAccount(userAccount);
             user.setUserPassword(encryptPassword);
             user.setUsername("eb_" + RandomUtil.randomString(8));
+            user.setUserAvatar(userAvatar);
             boolean saveResult = this.save(user);
             if (!saveResult) {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");

@@ -30,7 +30,7 @@ public interface UserService extends IService<User> {
      * @param captchaCode   验证码
      * @return 新用户 id
      */
-    long userRegister(String userAccount, String userPassword, String checkPassword, String captchaKey, String captchaCode);
+    long userRegister(String userAccount, String userPassword, String checkPassword, String captchaKey, String captchaCode, String userAvatar);
 
     /**
      * 用户登录
