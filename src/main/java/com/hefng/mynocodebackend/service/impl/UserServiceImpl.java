@@ -13,6 +13,8 @@ import com.hefng.mynocodebackend.model.vo.LoginUserVO;
 import com.hefng.mynocodebackend.model.vo.UserVO;
 import com.hefng.mynocodebackend.utils.SqlUtils;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.row.Db;
+import com.mybatisflex.core.row.Row;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.hefng.mynocodebackend.model.entity.User;
 import com.hefng.mynocodebackend.mapper.UserMapper;
@@ -96,6 +98,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
             user.setUserPassword(encryptPassword);
             user.setUsername("eb_" + RandomUtil.randomString(8));
             user.setUserAvatar(userAvatar);
+            user.setAppMaxCount(3);
+            user.setAppUsedCount(0);
             boolean saveResult = this.save(user);
             if (!saveResult) {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
@@ -292,5 +296,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         }
 
         return queryWrapper;
+    }
+
+    @Override
+    public boolean incrementAppUsedCountIfWithinLimit(Long userId) {
+        QueryWrapper qw = QueryWrapper.create()
+                .where(USER.ID.eq(userId))
+                .and(USER.APP_USED_COUNT.lt(USER.APP_MAX_COUNT));
+        Row row = new Row().setRaw("appUsedCount", "appUsedCount + 1", true);
+        return Db.updateByQuery("user", row, qw) > 0;
+    }
+
+    @Override
+    public void incrementAppUsedCount(Long userId) {
+        QueryWrapper qw = QueryWrapper.create()
+                .where(USER.ID.eq(userId));
+        Row row = new Row().setRaw("appUsedCount", "appUsedCount + 1", true);
+        Db.updateByQuery("user", row, qw);
     }
 }

@@ -36,5 +36,10 @@ public class UserUpdateRequest implements Serializable {
      */
     private String userRole;
 
+    /**
+     * 最大可创建应用数
+     */
+    private Integer appMaxCount;
+
     private static final long serialVersionUID = 1L;
 }

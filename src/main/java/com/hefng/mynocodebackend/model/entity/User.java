@@ -74,6 +74,18 @@ public class User implements Serializable {
     private String userRole;
 
     /**
+     * 最大可创建应用数
+     */
+    @Column("appMaxCount")
+    private Integer appMaxCount;
+
+    /**
+     * 已创建应用数
+     */
+    @Column("appUsedCount")
+    private Integer appUsedCount;
+
+    /**
      * 创建时间
      */
     @Column("createTime")

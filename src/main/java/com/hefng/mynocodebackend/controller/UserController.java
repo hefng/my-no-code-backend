@@ -215,8 +215,42 @@ public class UserController {
         if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        // 校验 appMaxCount：-1 表示不限制，其他值不能低于 appUsedCount
+        if (userUpdateRequest.getAppMaxCount() != null && userUpdateRequest.getAppMaxCount() != -1) {
+            User existing = userService.getById(userUpdateRequest.getId());
+            if (existing != null && userUpdateRequest.getAppMaxCount() < (existing.getAppUsedCount() != null ? existing.getAppUsedCount() : 0)) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "最大次数不能低于已使用次数");
+            }
+        }
         User user = new User();
         BeanUtils.copyProperties(userUpdateRequest, user);
+        // 如果设置为管理员角色，自动设置不限制创建次数
+        if (UserConstant.ADMIN_ROLE.equals(userUpdateRequest.getUserRole())) {
+            user.setAppMaxCount(-1);
+        }
+        boolean result = userService.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 管理员给用户增加应用创建次数
+     *
+     * @param request
+     * @return
+     */
+    @PostMapping("/add/quota")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> addAppQuota(@RequestBody AdminAddAppQuotaRequest request) {
+        if (request == null || request.getUserId() == null || request.getAddCount() == null
+                || request.getAddCount() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User user = userService.getById(request.getUserId());
+        ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+
+        int newMax = (user.getAppMaxCount() != null ? user.getAppMaxCount() : 0) + request.getAddCount();
+        user.setAppMaxCount(newMax);
         boolean result = userService.updateById(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);

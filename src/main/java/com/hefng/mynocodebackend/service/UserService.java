@@ -130,4 +130,19 @@ public interface UserService extends IService<User> {
      */
     QueryWrapper getQueryWrapper(UserQueryRequest userQueryRequest);
 
+    /**
+     * 原子递增已使用应用次数（仅当 appUsedCount < appMaxCount 时生效）
+     *
+     * @param userId 用户 id
+     * @return 是否更新成功（false 表示配额已用尽）
+     */
+    boolean incrementAppUsedCountIfWithinLimit(Long userId);
+
+    /**
+     * 原子递增已使用应用次数（不限制配额）
+     *
+     * @param userId 用户 id
+     */
+    void incrementAppUsedCount(Long userId);
+
 }

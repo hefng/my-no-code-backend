@@ -67,3 +67,16 @@ alter table app
 -- 在 user 表添加 githubId 字段用于关联 GitHub 账号
 ALTER TABLE `user` ADD COLUMN `githubId` BIGINT NULL COMMENT 'GitHub 用户 ID' AFTER `userProfile`;
 CREATE UNIQUE INDEX `idx_githubId` ON `user` (`githubId`);
+
+-- 用户应用创建配额功能迁移
+-- 在 user 表添加 appMaxCount 和 appUsedCount 字段
+ALTER TABLE `user` ADD COLUMN `appMaxCount` INT DEFAULT 3 NOT NULL COMMENT '最大可创建应用数' AFTER `userRole`;
+ALTER TABLE `user` ADD COLUMN `appUsedCount` INT DEFAULT 0 NOT NULL COMMENT '已创建应用数' AFTER `appMaxCount`;
+
+-- 回填已有用户的已使用次数
+UPDATE `user` u SET `appUsedCount` = (
+    SELECT COUNT(*) FROM `app` a WHERE a.appOwnerId = u.id AND a.isDelete = 0
+) WHERE u.isDelete = 0;
+
+-- 管理员用户不限制创建次数
+UPDATE `user` SET `appMaxCount` = -1 WHERE `userRole` = 'admin' AND `isDelete` = 0;

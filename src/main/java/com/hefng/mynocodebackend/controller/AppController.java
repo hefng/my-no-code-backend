@@ -160,7 +160,20 @@ public class AppController {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存应用失败: " + e.getMessage());
         }
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        
+
+        // 原子递增已使用次数（校验+递增合为一条 SQL，防并发）
+        // appMaxCount 为 -1 时表示不限制，仅递增计数
+        if (loginUser.getAppMaxCount() != null && loginUser.getAppMaxCount() == -1) {
+            userService.incrementAppUsedCount(loginUser.getId());
+        } else {
+            boolean updated = userService.incrementAppUsedCountIfWithinLimit(loginUser.getId());
+            if (!updated) {
+                // 配额已用尽，回滚已创建的应用
+                appService.removeById(app.getId());
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "应用创建次数已用尽");
+            }
+        }
+
         return ResultUtils.success(app.getId());
     }
 

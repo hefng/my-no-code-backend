@@ -44,6 +44,16 @@ public class LoginUserVO implements Serializable {
     private String userRole;
 
     /**
+     * 最大可创建应用数
+     */
+    private Integer appMaxCount;
+
+    /**
+     * 已创建应用数
+     */
+    private Integer appUsedCount;
+
+    /**
      * 创建时间
      */
     private Date createTime;

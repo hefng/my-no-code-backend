@@ -123,6 +123,8 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
             user.setUserAvatar(githubAvatarUrl);
             user.setGithubId(githubId);
             user.setUserRole("user");
+            user.setAppMaxCount(3);
+            user.setAppUsedCount(0);
 
             boolean saved = userService.save(user);
             if (!saved) {

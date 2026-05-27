@@ -72,6 +72,16 @@ public class UserTableDef extends TableDef {
     public final QueryColumn USER_PASSWORD = new QueryColumn(this, "userPassword");
 
     /**
+     * 最大可创建应用数
+     */
+    public final QueryColumn APP_MAX_COUNT = new QueryColumn(this, "appMaxCount");
+
+    /**
+     * 已创建应用数
+     */
+    public final QueryColumn APP_USED_COUNT = new QueryColumn(this, "appUsedCount");
+
+    /**
      * 所有字段。
      */
     public final QueryColumn ALL_COLUMNS = new QueryColumn(this, "*");
@@ -79,7 +89,7 @@ public class UserTableDef extends TableDef {
     /**
      * 默认字段，不包含逻辑删除或者 large 等字段。
      */
-    public final QueryColumn[] DEFAULT_COLUMNS = new QueryColumn[]{ID, USER_ACCOUNT, USER_PASSWORD, USERNAME, USER_AVATAR, USER_PROFILE, USER_ROLE, CREATE_TIME, UPDATE_TIME, };
+    public final QueryColumn[] DEFAULT_COLUMNS = new QueryColumn[]{ID, USER_ACCOUNT, USER_PASSWORD, USERNAME, USER_AVATAR, USER_PROFILE, USER_ROLE, APP_MAX_COUNT, APP_USED_COUNT, CREATE_TIME, UPDATE_TIME, };
 
     public UserTableDef() {
         super("my_nocode_backend", "user");

@@ -1,6 +1,6 @@
 declare namespace API {
   type App = {
-    id?: number
+    id?: string | number
     appName?: string
     appDesc?: string
     appCover?: string
@@ -8,7 +8,7 @@ declare namespace API {
     initPrompt?: string
     deployedKey?: string
     deployedTime?: string
-    appOwnerId?: number
+    appOwnerId?: string | number
     priority?: number
     createTime?: string
     updateTime?: string
@@ -23,7 +23,7 @@ declare namespace API {
   }
 
   type AppDeployedRequest = {
-    appId?: number
+    appId?: string
   }
 
   type AppQueryRequest = {
@@ -31,35 +31,35 @@ declare namespace API {
     pageSize?: number
     sortField?: string
     sortOrder?: string
-    id?: number
+    id?: string | number
     appName?: string
     appDesc?: string
     codegenType?: string
-    appOwnerId?: number
+    appOwnerId?: string | number
     priority?: number
   }
 
   type AppUpdateMyRequest = {
-    id?: number
+    id?: string | number
     appName?: string
   }
 
   type AppUpdateRequest = {
-    id?: number
+    id?: string | number
     appName?: string
     appCover?: string
     priority?: number
   }
 
   type AppVO = {
-    id?: number
+    id?: string | number
     appName?: string
     appDesc?: string
     appCover?: string
     codegenType?: string
     deployedKey?: string
     deployedTime?: string
-    appOwnerId?: number
+    appOwnerId?: string | number
     priority?: number
     createTime?: string
     updateTime?: string
@@ -166,21 +166,21 @@ declare namespace API {
     pageSize?: number
     sortField?: string
     sortOrder?: string
-    appId?: number
+    appId?: string
     userId?: number
     chatMessageType?: string
     beforeTime?: string
   }
 
   type ChatHistorySaveRequest = {
-    appId?: number
+    appId?: string
     messages?: string
     chatMessageType?: string
   }
 
   type ChatHistoryVO = {
     id?: number
-    appId?: number
+    appId?: string
     userId?: number
     messages?: string
     chatMessageType?: string
@@ -189,13 +189,13 @@ declare namespace API {
   }
 
   type chatToGenCodeParams = {
-    appId: number
+    appId: string
     userMessage: string
     isAgent?: boolean
   }
 
   type DeleteRequest = {
-    id?: number
+    id?: string | number
   }
 
   type getAppByIdParams = {
@@ -211,7 +211,7 @@ declare namespace API {
   }
 
   type listLatestChatHistoryParams = {
-    appId: number
+    appId: string
   }
 
   type LoginUserVO = {
@@ -221,6 +221,8 @@ declare namespace API {
     userAvatar?: string
     userProfile?: string
     userRole?: string
+    appMaxCount?: number
+    appUsedCount?: number
     createTime?: string
     updateTime?: string
   }
@@ -274,7 +276,7 @@ declare namespace API {
 
   type serveStaticResourceParams = {
     codeGenType: string
-    appId: number
+    appId: string
   }
 
   type User = {
@@ -285,9 +287,16 @@ declare namespace API {
     userAvatar?: string
     userProfile?: string
     userRole?: string
+    appMaxCount?: number
+    appUsedCount?: number
     createTime?: string
     updateTime?: string
     isDelete?: number
+  }
+
+  type AdminAddAppQuotaRequest = {
+    userId?: number
+    addCount?: number
   }
 
   type UserAddRequest = {
@@ -334,6 +343,7 @@ declare namespace API {
     userAvatar?: string
     userProfile?: string
     userRole?: string
+    appMaxCount?: number
   }
 
   type UserVO = {
@@ -342,6 +352,8 @@ declare namespace API {
     userAvatar?: string
     userProfile?: string
     userRole?: string
+    appMaxCount?: number
+    appUsedCount?: number
     createTime?: string
   }
 }

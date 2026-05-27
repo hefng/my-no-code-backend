@@ -1,4 +1,3 @@
-// @ts-ignore
 /* eslint-disable */
 import request from '@/utils/request'
 
@@ -45,6 +44,7 @@ export async function getUserById(
 export async function getLoginUser(options?: { [key: string]: any }) {
   return request<API.BaseResponseLoginUserVO>('/user/get/login', {
     method: 'GET',
+    skipAuthRedirect: true,
     ...(options || {}),
   })
 }
@@ -165,6 +165,18 @@ export async function updateMyUser(
 export async function uploadUserAvatar(body: FormData, options?: { [key: string]: any }) {
   return request<API.BaseResponseString>('/user/avatar/upload', {
     method: 'POST',
+    data: body,
+    ...(options || {}),
+  })
+}
+
+/** 管理员给用户增加应用创建次数 POST /user/add/quota */
+export async function addAppQuota(body: API.AdminAddAppQuotaRequest, options?: { [key: string]: any }) {
+  return request<API.BaseResponseBoolean>('/user/add/quota', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     data: body,
     ...(options || {}),
   })
